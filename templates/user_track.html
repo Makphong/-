@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - ติดตามสถานะ</title>
+    <link rel="stylesheet" href="/static/css/web.css" />
+    <style>
+        .listItem.clickable {
+            cursor: pointer;
+        }
+
+        .listItem.clickable:hover {
+            border-color: rgba(30, 115, 216, .35);
+            background: rgba(30, 115, 216, .04);
+        }
+
+        .listItem.selected {
+            border-color: rgba(30, 115, 216, .45);
+            background: rgba(30, 115, 216, .06);
+        }
+
+        .inlineDetail {
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            background: #fff;
+        }
+
+        .inlineDetailHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .smallBtn {
+            padding: 9px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: #fff;
+            cursor: pointer;
+            font-weight: 800;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app">
+        <div class="card">
+            <div class="topbar">
+                <div class="brand">PCCM Service</div>
+                <a class="link" href="/logout">ออกจากระบบ</a>
+            </div>
+
+            <div class="tabs">
+                <button class="tab" type="button" id="tabSend">ส่งเรื่องร้องเรียน</button>
+                <button class="tab active" type="button" id="tabTrack">ติดตามสถานะการร้องเรียน</button>
+            </div>
+
+            <div class="content">
+                <h2 class="title">ติดตามสถานะการร้องเรียน</h2>
+
+                <!-- LIST (แสดงเฉพาะ 4 ฟิลด์) -->
+                {% if complaints|length == 0 %}
+                <div class="empty">ยังไม่มีรายการร้องเรียน</div>
+                {% else %}
+                <div id="list" class="list">
+                    {% for c in complaints %}
+                    <div class="listItem clickable" data-id="{{ c.id }}">
+                        <div class="row">
+                            <div class="col">
+                                <div class="label">วันที่แจ้ง</div>
+                                <div class="value">{{ c.created_at_fmt }}</div>
+                            </div>
+                            <div class="col">
+                                <div class="label">ผู้ร้องเรียน</div>
+                                <div class="value">{{ c.username }}</div>
+                            </div>
+                            <div class="col">
+                                <div class="label">สถานที่</div>
+                                <div class="value">{{ c.location or "-" }}</div>
+                            </div>
+                            <div class="col">
+                                <div class="label">สถานะ</div>
+                                <div class="badge">{{ c.status or "-" }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="footer">© 2025 PCCM Service. This system is developed for educational purposes.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== Tabs: replace เพื่อไม่สร้าง history ใหม่ =====
+        document.getElementById("tabSend").addEventListener("click", () => window.location.replace("/user/send"));
+        document.getElementById("tabTrack").addEventListener("click", () => window.location.replace("/user/track"));
+
+        // ===== Role/Home Guard (กัน history back ข้าม role + กัน bfcache) =====
+        function getCookie(name) {
+            const v = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith(name + "="));
+            return v ? decodeURIComponent(v.split("=", 2)[1]) : "";
+        }
+        function enforceRole() {
+            const loggedIn = getCookie("logged_in") === "1";
+            const role = getCookie("user_role");
+            const path = location.pathname;
+            if (!loggedIn) return;
+            if (role === "admin" && !path.startsWith("/admin")) location.replace("/admin");
+            if (role === "user" && path.startsWith("/admin")) location.replace("/user/send");
+        }
+        window.addEventListener("pageshow", enforceRole);
+        window.addEventListener("popstate", enforceRole);
+
+        // ===== Inline Detail under clicked row (toggle + single open) =====
+        const list = document.getElementById("list");
+        let activeId = null;
+        let detailEl = null;
+
+        function escapeHtml(s) {
+            return (s ?? "").toString()
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function renderAttachments(paths) {
+            if (!paths || paths.length === 0) {
+                return `<div class="value">ไม่มีไฟล์แนบ</div>`;
+            }
+            let html = `<div class="previewGrid">`;
+            for (const p of paths) {
+                const lower = (p || "").toLowerCase();
+                if (lower.endsWith(".mp4")) {
+                    html += `
+        <div class="previewCard">
+          <div class="previewMedia">
+            <video class="media" controls src="${escapeHtml(p)}"></video>
+          </div>
+        </div>
+      `;
+                } else {
+                    html += `
+        <div class="previewCard">
+          <div class="previewMedia">
+            <img class="media" src="${escapeHtml(p)}" alt="attachment"/>
+          </div>
+        </div>
+      `;
+                }
+            }
+            html += `</div>`;
+            return html;
+        }
+
+
+        function clearSelection() {
+            document.querySelectorAll(".listItem.selected").forEach(el => el.classList.remove("selected"));
+        }
+
+        function closeDetail(scrollUp = true) {
+            activeId = null;
+            clearSelection();
+            if (detailEl) {
+                detailEl.remove();
+                detailEl = null;
+            }
+            if (scrollUp && list) {
+                list.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        }
+
+        async function openDetailUnder(itemEl, id) {
+            clearSelection();
+            itemEl.classList.add("selected");
+
+            // remove previous detail
+            if (detailEl) {
+                detailEl.remove();
+                detailEl = null;
+            }
+
+            // create placeholder right under clicked row
+            detailEl = document.createElement("div");
+            detailEl.className = "inlineDetail";
+            detailEl.innerHTML = `
+        <div class="inlineDetailHeader">
+          <div style="font-weight:900;">รายละเอียดเรื่องร้องเรียน</div>
+          <button class="smallBtn" type="button" id="inlineCloseBtn">ปิด</button>
+        </div>
+        <div class="empty">กำลังโหลดรายละเอียด...</div>
+      `;
+
+            itemEl.insertAdjacentElement("afterend", detailEl);
+            detailEl.scrollIntoView({ behavior: "smooth", block: "start" });
+
+            detailEl.querySelector("#inlineCloseBtn").addEventListener("click", (e) => {
+                e.stopPropagation();
+                closeDetail(true);
+            });
+
+            const res = await fetch(`/user/complaint/${id}/detail`, { method: "GET" });
+            if (!res.ok) {
+                detailEl.querySelector(".empty").textContent = "ไม่พบรายละเอียด";
+                return;
+            }
+            const d = await res.json();
+
+            detailEl.innerHTML = `
+        <div class="inlineDetailHeader">
+          <div style="font-weight:900;">รายละเอียดเรื่องร้องเรียน</div>
+          <button class="smallBtn" type="button" id="inlineCloseBtn">ปิด</button>
+        </div>
+
+        <div class="detailBox" style="margin-top:0;">
+          <div class="label">ประเภทสิ่งของ</div>
+          <div class="value">${escapeHtml(d.item_type || "-")}</div>
+        </div>
+
+        <div class="detailBox" style="margin-top:12px;">
+          <div class="label">รายละเอียด</div>
+          <div class="value" style="white-space:pre-wrap;">${escapeHtml(d.description || "-")}</div>
+        </div>
+
+        <div class="detailBox" style="margin-top:12px;">
+          <div class="label">ไฟล์แนบ</div>
+          ${renderAttachments(d.attachments || [])}
+        </div>
+      `;
+
+            detailEl.querySelector("#inlineCloseBtn").addEventListener("click", (e) => {
+                e.stopPropagation();
+                closeDetail(true);
+            });
+        }
+
+        if (list) {
+            list.addEventListener("click", (e) => {
+                const item = e.target.closest(".listItem[data-id]");
+                if (!item) return;
+
+                const id = item.getAttribute("data-id");
+
+                // toggle close if click same item
+                if (activeId === id) {
+                    closeDetail(true);
+                    return;
+                }
+
+                // open new (single open)
+                activeId = id;
+                openDetailUnder(item, id);
+            });
+        }
+    </script>
+</body>
+
+</html>

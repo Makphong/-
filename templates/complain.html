@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ส่งเรื่องร้องเรียน</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="/static/css/complaint.css">
+</head>
+
+<body>
+
+    <div class="complaint-container">
+        <h2>ส่งเรื่องร้องเรียน</h2>
+
+        <form action="/submit-complaint" method="POST" enctype="multipart/form-data">
+
+            <!-- Username (auto-filled) -->
+            <label>ชื่อผู้ร้องเรียน</label>
+            <input type="text" name="username" value="{{ username }}" readonly>
+
+            <!-- Location -->
+            <label>สถานที่เกิดปัญหา</label>
+            <select name="location" required>
+                <option value="">เลือกสถานที่</option>
+                <option>อาคารปฏิบัติการวิศวกรรม</option>
+                <option>อาคารเรียนราชวิทย์</option>
+                <option>อาคารอำนวยการ</option>
+                <option>อาคารปฏิบัติการทางวิทยาศาสตร์</option>
+                <option>โรงอาหาร</option>
+                <option>อาคารศูนย์กีฬา</option>
+            </select>
+
+            <!-- Image upload -->
+            <label>แนบรูปภาพ</label>
+            <input type="file" name="image" accept="image/png, image/jpeg, image/webp" required>
+
+            <!-- Description -->
+            <label>อธิบายปัญหา</label>
+            <textarea name="description" rows="4" placeholder="อธิบายรายละเอียดของปัญหา" required></textarea>
+
+            <button type="submit" class="submit-btn">
+                ส่งเรื่องร้องเรียน
+            </button>
+
+        </form>
+    </div>
+
+    <footer>
+        <p>
+            © 2025 PCCM Service.
+            This system is developed for educational purposes.
+            Reuse or modification requires prior notice to the author.
+        </p>
+    </footer>
+
+</body>
+
+</html>

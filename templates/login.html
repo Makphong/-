@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+    <link rel="stylesheet" href="/static/css/web.css" />
+</head>
+
+<body class="bodylogin">
+    <div class="app">
+        <div class="loginWrap">
+            <!-- Header (โลโก้ + ชื่อ) -->
+            <div class="loginHeader">
+                <img class="loginLogo" src="https://www.pccm.ac.th/2020/assets/images/logo-20250108115350.png"
+                    alt="PCCM Logo" />
+                <!-- PCCM SERVICE: ฟอนต์/สี แบบ v0.2.1 -->
+                <div class="loginTitleEn">PCCM SERVICE</div>
+                <!-- ข้อความไทย: ฟอนต์แบบ v0.3.0 (system) -->
+                <div class="loginTitleTh">ระบบรับเรื่องร้องเรียนปัญหาในโรงเรียน</div>
+            </div>
+
+            <!-- Card Login -->
+            <div class="card loginCard">
+                <div class="content">
+                    <h2 class="title" style="margin-top:0;">เข้าสู่ระบบ</h2>
+
+                    {% if error %}
+                    <div class="alert"
+                        style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#991b1b;">
+                        ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง
+                    </div>
+                    {% endif %}
+
+                    <form class="form" method="post" action="/login-system" autocomplete="off">
+                        <div class="field">
+                            <label>ชื่อผู้ใช้</label>
+                            <input type="text" name="username" placeholder="กรอกชื่อผู้ใช้" required />
+                        </div>
+
+                        <div class="field">
+                            <label>รหัสผ่าน</label>
+                            <input type="password" name="password" placeholder="กรอกรหัสผ่าน" required />
+                        </div>
+
+                        <button class="btn primary" type="submit" style="width:100%;">Login</button>
+                    </form>
+
+                    <div class="footer">© 2025 PCCM Service. This system is developed for educational purposes.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- (ข้อ 3) ถ้ายัง logged in อยู่: ห้ามอยู่หน้า login -->
+    <script>
+        (function () {
+            const cookies = document.cookie.split(";").map(v => v.trim());
+            const loggedIn = cookies.find(v => v.startsWith("logged_in="))?.split("=")[1];
+            const role = cookies.find(v => v.startsWith("user_role="))?.split("=")[1];
+
+            if (loggedIn === "1") {
+                if (role === "admin") {
+                    window.location.replace("/admin");
+                } else if (role === "user") {
+                    window.location.replace("/user/send");
+                }
+            }
+        })();
+    </script>
+</body>
+
+</html>

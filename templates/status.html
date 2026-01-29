@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ตรวจสอบสถานะเรื่องร้องเรียน</title>
+	<link rel="stylesheet" href="/static/css/web.css">
+</head>
+
+<body>
+
+	<h1>ตรวจสอบสถานะเรื่องร้องเรียน</h1>
+
+	<div class="review-container">
+
+		<!-- Filter Section -->
+		<div class="filter-box">
+			<h3>กรองรายการร้องเรียน</h3>
+
+			<label>สถานที่</label>
+			<select>
+				<option value="">เลือกสถานที่</option>
+				<option>อาคารปฏิบัติการวิศวกรรม</option>
+				<option>อาคารเรียนราชวิทย์</option>
+				<option>อาคารอำนวยการ</option>
+				<option>อาคารปฏิบัติการทางวิทยาศาสตร์</option>
+				<option>โรงอาหาร</option>
+				<option>อาคารศูนย์กีฬา</option>
+			</select>
+
+			<label>ระยะเวลา</label>
+			<select>
+				<option value="">เลือกช่วงเวลา</option>
+				<option>3 วันที่แล้ว</option>
+				<option>1 สัปดาห์ที่ผ่านมา</option>
+				<option>2 สัปดาห์ที่ผ่านมา</option>
+				<option>3 สัปดาห์ที่ผ่านมา</option>
+				<option>1 เดือนที่ผ่านมา</option>
+			</select>
+
+			<button class="filter-btn">ดูผลลัพธ์</button>
+		</div>
+
+
+		<!-- Complaint List -->
+		<div class="complaint-list">
+			<h3>รายการเรื่องร้องเรียน</h3>
+
+			<!-- Example Complaint 1 -->
+			<div class="complaint-card">
+				<h4>ปัญหาห้องน้ำ</h4>
+				<p>สถานะ: <span class="status working">กำลังดำเนินการ</span></p>
+				<button class="detail-btn">ดูรายละเอียด</button>
+			</div>
+
+			<!-- Example Complaint 2 -->
+			<div class="complaint-card">
+				<h4>ไฟห้องเรียนเสีย</h4>
+				<p>สถานะ: <span class="status done">เสร็จสิ้น</span></p>
+				<button class="detail-btn">ดูรายละเอียด</button>
+			</div>
+
+			<!-- Example Complaint 3 -->
+			<div class="complaint-card">
+				<h4>ขยะล้นโรงอาหาร</h4>
+				<p>สถานะ: <span class="status pending">ยังไม่รับเรื่อง</span></p>
+				<button class="detail-btn">ดูรายละเอียด</button>
+			</div>
+
+		</div>
+
+	</div>
+
+	<footer>
+		<p>© 2025 PCCM Service. All rights reserved.</p>
+	</footer>
+</body>
+
+</html>

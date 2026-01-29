@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - ส่งเรื่องร้องเรียน</title>
+    <link rel="stylesheet" href="/static/css/web.css" />
+</head>
+
+<body>
+    <div class="app">
+        <div class="card">
+            <div class="topbar">
+                <div class="brand">PCCM Service</div>
+                <a class="link" href="/logout">ออกจากระบบ</a>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" type="button" id="tabSend">ส่งเรื่องร้องเรียน</button>
+                <button class="tab" type="button" id="tabTrack">ติดตามสถานะการร้องเรียน</button>
+            </div>
+
+            <div class="content">
+                <h2 class="title">ส่งเรื่องร้องเรียน</h2>
+
+                {% if submitted %}
+                <div class="alert success">ส่งเรื่องร้องเรียนสำเร็จ</div>
+                {% endif %}
+
+                <form class="form" method="post" action="/submit-complaint" enctype="multipart/form-data">
+
+                    <!-- 1) ชื่อผู้ร้องเรียน -->
+                    <div class="field">
+                        <label>ชื่อผู้ร้องเรียน</label>
+                        <input type="text" value="{{ username }}" readonly />
+                    </div>
+
+                    <!-- 2) ประเภทสิ่งของ -->
+                    <div class="field">
+                        <label>ประเภทสิ่งของ</label>
+                        <select name="item_type" required>
+                            <option value="" selected disabled>เลือกประเภทสิ่งของ</option>
+                            <option>ไฟฟ้า/ไฟสว่าง</option>
+                            <option>น้ำ/ห้องน้ำ</option>
+                            <option>ห้องเรียน/อาคาร</option>
+                            <option>ประตู/หน้าต่าง</option>
+                            <option>โต๊ะ/เก้าอี้/เฟอร์นิเจอร์</option>
+                            <option>คอมพิวเตอร์/โปรเจคเตอร์/อินเทอร์เน็ต</option>
+                            <option>อุปกรณ์กีฬา/เครื่องออกกำลังกาย</option>
+                        </select>
+                    </div>
+
+                    <!-- 3) อาคาร 4) ชั้น 5) ห้อง -->
+                    <div class="grid2">
+                        <div class="field">
+                            <label>สถานที่เกิดปัญหา (ชื่ออาคาร)</label>
+                            <select id="buildingSelect" name="building" required>
+                                <option value="" selected disabled>เลือกอาคาร</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label>ชั้นของอาคาร</label>
+                            <select id="floorSelect" name="floor" required>
+                                <option value="" selected disabled>เลือกชั้น</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>ห้องที่เกิดปัญหา</label>
+                        <select id="roomSelect" name="room" required>
+                            <option value="" selected disabled>เลือกห้อง/อื่นๆ</option>
+                        </select>
+                    </div>
+
+                    <!-- 6) แนบไฟล์ -->
+                    <div class="field">
+                        <label>แนบไฟล์ (สูงสุด 3 ไฟล์: .jpg .png .mp4 | 10MB/ไฟล์)</label>
+
+                        <div class="uploader">
+                            <input id="fileInput" class="file" type="file" name="files" multiple
+                                accept=".jpg,.jpeg,.png,.mp4" />
+                            <div class="uploaderHint">
+                                เลือกไฟล์หรือ drag & drop ที่นี่
+                            </div>
+                        </div>
+
+                        <div id="preview" class="previewGrid"></div>
+                    </div>
+
+                    <!-- 7) อธิบายปัญหา -->
+                    <div class="field">
+                        <label>อธิบายปัญหา</label>
+                        <textarea name="description" rows="5" placeholder="อธิบายรายละเอียดของปัญหา"
+                            required></textarea>
+                    </div>
+
+                    <button class="btn primary" type="submit">ส่งเรื่องร้องเรียน</button>
+                </form>
+
+                <div class="footer">© 2025 PCCM Service. This system is developed for educational purposes.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== Role/Home Guard (กัน history back ข้าม role + กัน bfcache) =====
+        function getCookie(name) {
+            const v = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith(name + "="));
+            return v ? decodeURIComponent(v.split("=", 2)[1]) : "";
+        }
+        function enforceRole() {
+            const loggedIn = getCookie("logged_in") === "1";
+            const role = getCookie("user_role");
+            const path = location.pathname;
+
+            if (!loggedIn) return;
+
+            if (role === "admin" && !path.startsWith("/admin")) {
+                location.replace("/admin");
+                return;
+            }
+            if (role === "user" && path.startsWith("/admin")) {
+                location.replace("/user/send");
+                return;
+            }
+        }
+        window.addEventListener("pageshow", enforceRole);
+        window.addEventListener("popstate", enforceRole);
+
+        // ===== Tabs: replace เพื่อไม่สร้าง history ใหม่ =====
+        document.getElementById("tabSend").addEventListener("click", () => window.location.replace("/user/send"));
+        document.getElementById("tabTrack").addEventListener("click", () => window.location.replace("/user/track"));
+
+        // ===== Mock data: อาคาร -> ชั้น -> ห้อง =====
+        const data = {
+            "อาคารปฏิบัติการวิศวกรรม": {
+                "ชั้น 1": ["101", "102", "103", "โถง", "ทางเดิน"],
+                "ชั้น 2": ["201", "202", "203", "โถง", "ทางเดิน"],
+                "ชั้น 3": ["301", "302", "303", "โถง", "ทางเดิน"]
+            },
+            "อาคารเรียนราชวิทย์": {
+                "ชั้น 1": ["101", "102", "103", "โถง", "ทางเดิน"],
+                "ชั้น 2": ["201", "202", "203", "โถง", "ทางเดิน"],
+                "ชั้น 3": ["301", "302", "303", "โถง", "ทางเดิน"],
+                "ชั้น 4": ["401", "402", "403", "โถง", "ทางเดิน"]
+            },
+            "อาคารอำนวยการ": {
+                "ชั้น 1": ["สำนักงาน 1", "สำนักงาน 2", "โถง", "ทางเดิน"],
+                "ชั้น 2": ["ห้องประชุม", "ฝ่ายวิชาการ", "โถง", "ทางเดิน"],
+                "ชั้น 3": ["งานทะเบียน", "การเงิน", "โถง", "ทางเดิน"]
+            },
+            "อาคารปฏิบัติการทางวิทยาศาสตร์": {
+                "ชั้น 1": ["ห้องแล็บ 1", "ห้องแล็บ 2", "โถง", "ทางเดิน"],
+                "ชั้น 2": ["ห้องแล็บ 3", "ห้องแล็บ 4", "โถง", "ทางเดิน"],
+                "ชั้น 3": ["ห้องเตรียมสาร", "ห้องเก็บอุปกรณ์", "โถง", "ทางเดิน"]
+            },
+            "โรงอาหาร": {
+                "ชั้น 1": ["โซน A", "โซน B", "จุดล้างมือ", "โถง", "ทางเดิน"]
+            },
+            "อาคารศูนย์กีฬา": {
+                "ชั้น 1": ["ห้องพละ", "ห้องอุปกรณ์", "สนามในร่ม", "โถง", "ทางเดิน"],
+                "ชั้น 2": ["ฟิตเนส", "อัฒจันทร์", "โถง", "ทางเดิน"]
+            }
+        };
+
+        const buildingSelect = document.getElementById("buildingSelect");
+        const floorSelect = document.getElementById("floorSelect");
+        const roomSelect = document.getElementById("roomSelect");
+
+        Object.keys(data).forEach(b => {
+            const opt = document.createElement("option");
+            opt.value = b;
+            opt.textContent = b;
+            buildingSelect.appendChild(opt);
+        });
+
+        function resetFloors() {
+            floorSelect.innerHTML = '<option value="" selected disabled>เลือกชั้น</option>';
+            roomSelect.innerHTML = '<option value="" selected disabled>เลือกห้อง/อื่นๆ</option>';
+        }
+
+        buildingSelect.addEventListener("change", () => {
+            resetFloors();
+            const b = buildingSelect.value;
+            Object.keys(data[b] || {}).forEach(f => {
+                const opt = document.createElement("option");
+                opt.value = f;
+                opt.textContent = f;
+                floorSelect.appendChild(opt);
+            });
+        });
+
+        floorSelect.addEventListener("change", () => {
+            roomSelect.innerHTML = '<option value="" selected disabled>เลือกห้อง/อื่นๆ</option>';
+            const b = buildingSelect.value;
+            const f = floorSelect.value;
+            (data[b]?.[f] || []).forEach(r => {
+                const opt = document.createElement("option");
+                opt.value = r;
+                opt.textContent = r;
+                roomSelect.appendChild(opt);
+            });
+        });
+
+        // ===== Upload preview + remove + limit =====
+        const input = document.getElementById("fileInput");
+        const preview = document.getElementById("preview");
+        let dt = new DataTransfer();
+
+        function humanMB(bytes) { return (bytes / (1024 * 1024)).toFixed(2) + " MB"; }
+
+        function renderPreview() {
+            preview.innerHTML = "";
+            [...dt.files].forEach((file, idx) => {
+                const card = document.createElement("div");
+                card.className = "previewCard";
+
+                const meta = document.createElement("div");
+                meta.className = "previewMeta";
+                meta.innerHTML = `<div class="name">${file.name}</div><div class="size">${humanMB(file.size)}</div>`;
+
+                const remove = document.createElement("button");
+                remove.type = "button";
+                remove.className = "removeBtn";
+                remove.innerHTML = "✕";
+                remove.addEventListener("click", () => {
+                    const newDt = new DataTransfer();
+                    [...dt.files].forEach((f, i) => { if (i !== idx) newDt.items.add(f); });
+                    dt = newDt;
+                    input.files = dt.files;
+                    renderPreview();
+                });
+
+                const media = document.createElement("div");
+                media.className = "previewMedia";
+
+                const ext = ("." + (file.name.split(".").pop() || "")).toLowerCase();
+                const url = URL.createObjectURL(file);
+
+                if (ext === ".mp4") {
+                    const v = document.createElement("video");
+                    v.src = url;
+                    v.controls = true;
+                    v.className = "media";
+                    media.appendChild(v);
+                } else {
+                    const img = document.createElement("img");
+                    img.src = url;
+                    img.className = "media";
+                    img.alt = file.name;
+                    media.appendChild(img);
+                }
+
+                card.appendChild(remove);
+                card.appendChild(media);
+                card.appendChild(meta);
+                preview.appendChild(card);
+            });
+        }
+
+        function validateAndAddFiles(fileList) {
+            const files = [...fileList];
+
+            if (dt.files.length + files.length > 3) {
+                alert("แนบไฟล์ได้สูงสุด 3 ไฟล์");
+                return;
+            }
+
+            for (const f of files) {
+                const ext = ("." + (f.name.split(".").pop() || "")).toLowerCase();
+                if (![".jpg", ".jpeg", ".png", ".mp4"].includes(ext)) {
+                    alert("ไฟล์ต้องเป็น .jpg .png .mp4 เท่านั้น");
+                    return;
+                }
+                if (f.size > 10 * 1024 * 1024) {
+                    alert("ไฟล์ต้องไม่เกิน 10MB ต่อไฟล์");
+                    return;
+                }
+            }
+
+            files.forEach(f => dt.items.add(f));
+            input.files = dt.files;
+            renderPreview();
+        }
+
+        input.addEventListener("change", (e) => {
+            validateAndAddFiles(e.target.files);
+            // ห้ามล้าง input.value เพราะจะทำให้ไฟล์หายตอน submit ในบางเบราว์เซอร์
+        });
+
+
+        const uploader = document.querySelector(".uploader");
+        uploader.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            uploader.classList.add("drag");
+        });
+        uploader.addEventListener("dragleave", () => uploader.classList.remove("drag"));
+        uploader.addEventListener("drop", (e) => {
+            e.preventDefault();
+            uploader.classList.remove("drag");
+            validateAndAddFiles(e.dataTransfer.files);
+        });
+    </script>
+</body>
+
+</html>
