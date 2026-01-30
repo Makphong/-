@@ -1,7 +1,5 @@
 # Pccm-python 
-<a href="[https://example.com](https://replit.com/@SuttipatKaewniw/Pccm-python)" target="_blank">
-  <img src="https://img.shields.io/badge/Replit-DD1200?style=for-the-badge&logo=Replit&logoColor=white" />
-</a>
+
 
 รันบน Replit (สร้าง Packager files) 
 1. สร้างโปรเจกต์ <br> ```bash uv init --no-progress --no-readme --no-pin-python --name repl_nix_workspace ```
