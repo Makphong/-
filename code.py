@@ -856,6 +856,65 @@ async def admin_update_status(
     return _redirect("/admin/complaints")
 
 
+@app.post("/admin/delete-work-file")
+def admin_delete_work_file(
+    request: Request,
+    complaint_id: int = Form(...),
+    file_path: str = Form(...),
+    authorization: str | None = Header(None),
+):
+    user = get_current_user(request, authorization)
+    if user.get("role") not in ("admin", "root"):
+        raise HTTPException(403, "Admins only")
+
+    # ต้องเป็น path ของ work/<complaint_id>/ เท่านั้น
+    prefix = f"/static/uploads/work/{complaint_id}/"
+    if not (file_path or "").startswith(prefix):
+        raise HTTPException(400, "invalid file path")
+
+    conn = db()
+    row = conn.execute(
+        "SELECT work_attachments FROM complaints WHERE id = ?",
+        (complaint_id,),
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(404, "Not found")
+
+    try:
+        lst = json.loads((row["work_attachments"] or "[]"))
+        if not isinstance(lst, list):
+            lst = []
+    except Exception:
+        lst = []
+
+    if file_path not in lst:
+        # ไม่มีไฟล์นี้ในรายการ ก็กลับไปเลย
+        return _redirect("/admin/complaints")
+
+    # อัปเดต DB (เอาออกจาก list)
+    new_list = [p for p in lst if p != file_path]
+    conn.execute(
+        "UPDATE complaints SET work_attachments = ? WHERE id = ?",
+        (json.dumps(new_list, ensure_ascii=False), complaint_id),
+    )
+    conn.commit()
+
+    # ลบไฟล์จริงบนดิสก์ (กัน path traversal ด้วยการตรวจ resolved path)
+    rel = file_path.lstrip("/")  # static/uploads/work/...
+    target = (BASE_DIR / rel).resolve()
+    allowed_root = (UPLOAD_DIR / "work" / str(complaint_id)).resolve()
+
+    try:
+        if str(target).startswith(str(allowed_root)) and target.exists():
+            target.unlink(missing_ok=True)
+    except Exception:
+        # ไม่ให้พัง flow แม้ลบไฟล์ไม่ได้
+        pass
+
+    return _redirect("/admin/complaints")
+
+
 @app.get("/admin/complaints")
 def admin_view_complaints(request: Request, authorization: str | None = Header(None)):
     user = get_current_user(request, authorization)

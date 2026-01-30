@@ -31,7 +31,7 @@
           flex-wrap: nowrap;
         }
         .proofUpload {
-          min-width: 220px;
+          min-width: 0;
         }
         .statusSelect {
           flex: 1;
@@ -42,7 +42,54 @@
         }
       }
 
+      /* ===== Responsive Update Row ===== */
+      @media (max-width: 599px) {
+        .updateControls {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .updateForm {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .proofUpload,
+        .statusSelect,
+        #updateBtn {
+          width: 100%;
+        }
+        form[data-delete="1"],
+        form[data-delete="1"] .btn {
+          width: 100%;
+        }
+      }
+
+      @media (min-width: 600px) and (max-width: 899px) {
+        .updateControls {
+          flex-wrap: nowrap;
+        }
+        .updateForm {
+          flex-wrap: nowrap;
+        }
+        .proofUpload {
+          min-width: 180px;
+          flex: 0 0 auto;
+        }
+        .statusSelect {
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+        #updateBtn {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+        form[data-delete="1"] {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+      }
+
       /* ===== Complaint Detail Layout (Desktop 2 columns) ===== */
+
       .detailSplit {
         display: grid;
         grid-template-columns: 1fr;
@@ -82,7 +129,9 @@
       .mediaSlide {
         display: none;
         padding: 10px 12px 12px 12px;
+        position: relative;
       }
+
       .mediaSlide.active {
         display: block;
       }
@@ -103,6 +152,23 @@
         background: #fff;
         cursor: pointer;
         font-weight: 900;
+      }
+
+      .mediaDeleteBtn {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        border: 1px solid rgba(239, 68, 68, 0.45);
+        background: rgba(255, 255, 255, 0.92);
+        color: #b91c1c;
+        border-radius: 12px;
+        padding: 8px 10px;
+        font-weight: 900;
+        cursor: pointer;
+        backdrop-filter: blur(6px);
+      }
+      .mediaDeleteBtn:hover {
+        background: rgba(239, 68, 68, 0.12);
       }
 
       /* ===== Proof Upload (brown box) ===== */
@@ -224,7 +290,8 @@
       }
 
       .statusSelect {
-        min-width: 220px;
+        min-width: 0;
+        flex: 1 1 auto;
         font-weight: 900;
       }
 
@@ -742,6 +809,8 @@
         sliderKey,
         title = "ไฟล์แนบ",
         emptyText = "ไม่มีไฟล์แนบ",
+        deletable = false,
+        complaintId = null,
       ) {
         if (!paths || paths.length === 0) {
           return `<div class="value">${escapeHtml(emptyText)}</div>`;
@@ -756,11 +825,25 @@
           if (lower.endsWith(".mp4")) {
             slides += `
 <div class="mediaSlide" data-idx="${i}">
+  ${
+    deletable
+      ? `<button type="button" class="mediaDeleteBtn" data-complaint-id="${escapeHtml(
+          complaintId,
+        )}" data-file-path="${escapeHtml(p)}">ลบไฟล์</button>`
+      : ``
+  }
   <video class="media" controls src="${escapeHtml(p)}"></video>
 </div>`;
           } else {
             slides += `
 <div class="mediaSlide" data-idx="${i}">
+  ${
+    deletable
+      ? `<button type="button" class="mediaDeleteBtn" data-complaint-id="${escapeHtml(
+          complaintId,
+        )}" data-file-path="${escapeHtml(p)}">ลบไฟล์</button>`
+      : ``
+  }
   <img class="media" src="${escapeHtml(p)}" alt="attachment"/>
 </div>`;
           }
@@ -886,11 +969,15 @@
           "ไฟล์แนบ",
           "ไม่มีไฟล์แนบ",
         );
+        const canDeleteWork =
+          CURRENT_ROLE === "admin" || CURRENT_ROLE === "root";
         const workHtml = renderMediaSlider(
           d.work_attachments || [],
           `work_${d.id}`,
           "ไฟล์หน้างาน (หลักฐานการดำเนินงาน)",
           "ยังไม่มีไฟล์หน้างาน",
+          canDeleteWork,
+          d.id,
         );
 
         const showDelete = CURRENT_ROLE === "root";
@@ -977,6 +1064,36 @@
           sel.addEventListener("change", () => applySelectColor(sel));
           // init sliders
           initSliders(detailEl);
+
+          // Admin/Root: delete work attachment
+          detailEl.querySelectorAll(".mediaDeleteBtn").forEach((btn) => {
+            btn.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              const cid = btn.getAttribute("data-complaint-id");
+              const fp = btn.getAttribute("data-file-path");
+
+              const r = await Swal.fire({
+                icon: "warning",
+                title: "ลบไฟล์หน้างาน?",
+                text: "ไฟล์จะถูกลบออกจากระบบทันที",
+                showCancelButton: true,
+                confirmButtonText: "ยืนยันลบ",
+                cancelButtonText: "ยกเลิก",
+                confirmButtonColor: "#ef4444",
+              });
+              if (!r.isConfirmed) return;
+
+              const f = document.createElement("form");
+              f.method = "post";
+              f.action = "/admin/delete-work-file";
+              f.innerHTML = `
+      <input type="hidden" name="complaint_id" value="${cid}">
+      <input type="hidden" name="file_path" value="${fp}">
+    `;
+              document.body.appendChild(f);
+              f.submit();
+            });
+          });
 
           // Require proof upload before update
           // Proof upload required ONLY when status is "เสร็จสิ้น"
