@@ -44,9 +44,7 @@ app.add_middleware(
 # STATIC + TEMPLATES
 # ======================
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-app.mount("/static",
-          StaticFiles(directory=str(BASE_DIR / "static")),
-          name="static")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
 # ======================
@@ -81,8 +79,7 @@ def ensure_schema():
     conn.commit()
 
     existing_cols = [
-        r["name"]
-        for r in conn.execute("PRAGMA table_info(complaints)").fetchall()
+        r["name"] for r in conn.execute("PRAGMA table_info(complaints)").fetchall()
     ]
     add_cols = [
         ("item_type", "TEXT"),
@@ -90,7 +87,9 @@ def ensure_schema():
         ("floor", "TEXT"),
         ("room", "TEXT"),
         ("attachments", "TEXT"),
+        ("work_attachments", "TEXT"),
     ]
+
     for col, coltype in add_cols:
         if col not in existing_cols:
             conn.execute(f"ALTER TABLE complaints ADD COLUMN {col} {coltype}")
@@ -98,6 +97,42 @@ def ensure_schema():
 
 
 ensure_schema()
+
+
+# ======================
+# ROLE MIGRATION (v0.5.0)
+# ======================
+# legacy roles:
+# - "user"  -> "student"
+# - "admin" -> "admin" (ยกเว้น username = "admin" จะเป็น "root")
+def migrate_roles():
+    conn = db()
+    rows = conn.execute("SELECT id, username, role FROM users").fetchall()
+
+    for r in rows:
+        username = (r["username"] or "").strip()
+        role = (r["role"] or "").strip().lower()
+
+        new_role = role
+
+        if role == "user":
+            new_role = "student"
+        elif role == "admin":
+            new_role = "root" if username == "admin" else "admin"
+
+        # ถ้าเป็น role ใหม่อยู่แล้ว ก็ยัง enforce admin= root
+        if role in ("student", "admin", "root"):
+            new_role = role
+            if username == "admin":
+                new_role = "root"
+
+        if new_role != role:
+            conn.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, r["id"]))
+
+    conn.commit()
+
+
+migrate_roles()
 
 # ======================
 # PASSWORD HASHING
@@ -117,7 +152,7 @@ def get_user(username: str):
     conn = db()
     row = conn.execute(
         "SELECT username, password, role FROM users WHERE username = ?",
-        (username, ),
+        (username,),
     ).fetchone()
     return dict(row) if row else None
 
@@ -137,6 +172,7 @@ def seed_user(username: str, password: str, role: str):
         pass
 
 
+seed_user("adminroot", "admin123", "root")
 seed_user("admin", "admin123", "admin")
 seed_user("user", "user123", "user")
 
@@ -157,8 +193,7 @@ def create_token(username: str, role: str) -> str:
 
 def decode_token(token: str) -> dict:
     try:
-        return jwt.decode(token, SECRET_KEY,
-                          algorithms=[ALGORITHM])  # validates exp
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])  # validates exp
     except JWTError:
         raise HTTPException(401, "Invalid or expired token")
 
@@ -222,6 +257,40 @@ async def save_upload_file(username: str, file: UploadFile) -> str:
     return f"/static/uploads/{username}/{safe_name}"
 
 
+async def save_upload_file_to(folder: str, file: UploadFile) -> str:
+    """
+    folder เช่น: "work/123"
+    จะเซฟเป็น: /static/uploads/work/123/<filename>
+    """
+    ext = _validate_ext(file.filename)
+
+    # กัน path traversal แบบง่าย: ตัดส่วนว่าง + ห้าม ..
+    parts = [p for p in (folder or "").split("/") if p and p != ".."]
+    target_dir = UPLOAD_DIR.joinpath(*parts)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_name = f"{int(time.time())}_{uuid.uuid4().hex}{ext}"
+    dest_path = target_dir / safe_name
+
+    size = 0
+    try:
+        with open(dest_path, "wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_SIZE_PER_FILE:
+                    raise HTTPException(400, "ไฟล์ต้องไม่เกิน 10MB ต่อไฟล์")
+                out.write(chunk)
+    except HTTPException:
+        if dest_path.exists():
+            dest_path.unlink(missing_ok=True)
+        raise
+
+    return "/static/uploads/" + "/".join(parts + [safe_name])
+
+
 # ======================
 # SECURITY / ROLE GUARD (Fix Back cross-role)
 # ======================
@@ -233,8 +302,7 @@ def _is_static(path: str) -> bool:
 
 
 def _no_store(resp: Response) -> Response:
-    resp.headers[
-        "Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
@@ -282,9 +350,13 @@ async def role_guard_middleware(request: Request, call_next):
     role = user.get("role")
 
     # Role-based routing guard
-    if path.startswith("/admin") and role != "admin":
+    # Role-based routing guard
+    # /admin -> admin และ root เข้าได้
+    if path.startswith("/admin") and role not in ("admin", "root"):
         return _redirect("/user/send")
-    if path.startswith("/user") and role != "user":
+
+    # /user -> student เท่านั้น
+    if path.startswith("/user") and role != "student":
         return _redirect("/admin")
 
     resp = await call_next(request)
@@ -306,18 +378,17 @@ def login_page(request: Request, authorization: str | None = Header(None)):
     if token:
         try:
             user = decode_token(token)
-            if user.get("role") == "admin":
+            if user.get("role") in ("admin", "root"):
                 return _redirect("/admin")
-            if user.get("role") == "user":
+            if user.get("role") == "student":
                 return _redirect("/user/send")
         except Exception:
             pass
 
     error = request.query_params.get("error")
-    resp = templates.TemplateResponse("login.html", {
-        "request": request,
-        "error": error
-    })
+    resp = templates.TemplateResponse(
+        "login.html", {"request": request, "error": error}
+    )
     return _no_store(resp)
 
 
@@ -328,17 +399,18 @@ def logout():
 
 @app.post("/login-system")
 def login_system(
-        request: Request,
-        username: str = Form(...),
-        password: str = Form(...),
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
 ):
     user = get_user(username)
     if not user or not verify_password(password, user["password"]):
         return _redirect("/login?error=1")
 
     token = create_token(user["username"], user["role"])
-    redirect_to = "/admin/dashboard" if user[
-        "role"] == "admin" else "/user/send"
+    redirect_to = (
+        "/admin/dashboard" if user["role"] in ("admin", "root") else "/user/send"
+    )
 
     resp = RedirectResponse(url=redirect_to, status_code=HTTP_303_SEE_OTHER)
 
@@ -351,11 +423,9 @@ def login_system(
         max_age=SESSION_SECONDS,
     )
     # readable cookies for client-side guard
-    resp.set_cookie("logged_in",
-                    "1",
-                    httponly=False,
-                    samesite="lax",
-                    max_age=SESSION_SECONDS)
+    resp.set_cookie(
+        "logged_in", "1", httponly=False, samesite="lax", max_age=SESSION_SECONDS
+    )
     resp.set_cookie(
         "user_role",
         user["role"],
@@ -384,17 +454,13 @@ def status_redirect():
 @app.get("/user/send", response_class=HTMLResponse)
 def user_send_page(request: Request, authorization: str | None = Header(None)):
     user = get_current_user(request, authorization)
-    if user.get("role") != "user":
+    if user.get("role") != "student":
         return _redirect("/admin")
 
     submitted = request.query_params.get("submitted")
     resp = templates.TemplateResponse(
         "user_send.html",
-        {
-            "request": request,
-            "username": user["sub"],
-            "submitted": submitted
-        },
+        {"request": request, "username": user["sub"], "submitted": submitted},
     )
     return _no_store(resp)
 
@@ -403,10 +469,9 @@ def user_send_page(request: Request, authorization: str | None = Header(None)):
 # USER DASHBOARD: TRACK TAB
 # ======================
 @app.get("/user/track", response_class=HTMLResponse)
-def user_track_page(request: Request,
-                    authorization: str | None = Header(None)):
+def user_track_page(request: Request, authorization: str | None = Header(None)):
     user = get_current_user(request, authorization)
-    if user.get("role") != "user":
+    if user.get("role") != "student":
         return _redirect("/admin")
 
     conn = db()
@@ -417,7 +482,7 @@ def user_track_page(request: Request,
     WHERE username = ?
     ORDER BY created_at DESC
     """,
-        (user["sub"], ),
+        (user["sub"],),
     ).fetchall()
 
     complaints = []
@@ -429,11 +494,7 @@ def user_track_page(request: Request,
 
     resp = templates.TemplateResponse(
         "user_track.html",
-        {
-            "request": request,
-            "username": user["sub"],
-            "complaints": complaints
-        },
+        {"request": request, "username": user["sub"], "complaints": complaints},
     )
     return _no_store(resp)
 
@@ -442,11 +503,11 @@ def user_track_page(request: Request,
 # USER: DETAIL
 # ======================
 @app.get("/user/complaint/{complaint_id}/detail")
-def user_complaint_detail_json(request: Request,
-                               complaint_id: int,
-                               authorization: str | None = Header(None)):
+def user_complaint_detail_json(
+    request: Request, complaint_id: int, authorization: str | None = Header(None)
+):
     user = get_current_user(request, authorization)
-    if user.get("role") != "user":
+    if user.get("role") != "student":
         return _redirect("/admin")
 
     conn = db()
@@ -466,7 +527,11 @@ def user_complaint_detail_json(request: Request,
     except Exception:
         attachments_list = []
 
-    # ส่งเฉพาะที่ UI ใช้
+    try:
+        work_attachments_list = json.loads(c.get("work_attachments") or "[]")
+    except Exception:
+        work_attachments_list = []
+
     return {
         "id": c.get("id"),
         "created_at_fmt": c.get("created_at_fmt"),
@@ -476,15 +541,16 @@ def user_complaint_detail_json(request: Request,
         "item_type": c.get("item_type"),
         "description": c.get("description"),
         "attachments": attachments_list,
+        "work_attachments": work_attachments_list,
     }
 
 
 @app.get("/user/complaint/{complaint_id}", response_class=HTMLResponse)
-def user_complaint_detail(request: Request,
-                          complaint_id: int,
-                          authorization: str | None = Header(None)):
+def user_complaint_detail(
+    request: Request, complaint_id: int, authorization: str | None = Header(None)
+):
     user = get_current_user(request, authorization)
-    if user.get("role") != "user":
+    if user.get("role") != "student":
         return _redirect("/admin")
 
     conn = db()
@@ -502,11 +568,14 @@ def user_complaint_detail(request: Request,
     except Exception:
         c["attachments_list"] = []
 
-    resp = templates.TemplateResponse("user_detail.html", {
-        "request": request,
-        "username": user["sub"],
-        "c": c
-    })
+    try:
+        c["work_attachments_list"] = json.loads(c.get("work_attachments") or "[]")
+    except Exception:
+        c["work_attachments_list"] = []
+
+    resp = templates.TemplateResponse(
+        "user_detail.html", {"request": request, "username": user["sub"], "c": c}
+    )
     return _no_store(resp)
 
 
@@ -515,17 +584,17 @@ def user_complaint_detail(request: Request,
 # ======================
 @app.post("/submit-complaint")
 async def submit_complaint(
-        request: Request,
-        item_type: str = Form(...),
-        building: str = Form(...),
-        floor: str = Form(...),
-        room: str = Form(...),
-        description: str = Form(...),
-        files: list[UploadFile] = File(default=[]),
-        authorization: str | None = Header(None),
+    request: Request,
+    item_type: str = Form(...),
+    building: str = Form(...),
+    floor: str = Form(...),
+    room: str = Form(...),
+    description: str = Form(...),
+    files: list[UploadFile] = File(default=[]),
+    authorization: str | None = Header(None),
 ):
     user = get_current_user(request, authorization)
-    if user.get("role") != "user":
+    if user.get("role") != "student":
         return _redirect("/admin")
 
     if files and len(files) > MAX_FILES:
@@ -542,8 +611,9 @@ async def submit_complaint(
     conn = db()
     conn.execute(
         """
-        INSERT INTO complaints (username, location, description, status, created_at, item_type, building, floor, room, attachments)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO complaints (username, location, description, status, created_at, item_type, building, floor, room, attachments, work_attachments)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+
         """,
         (
             user["sub"],
@@ -556,6 +626,7 @@ async def submit_complaint(
             floor,
             room,
             json.dumps(saved_paths, ensure_ascii=False),
+            json.dumps([], ensure_ascii=False),
         ),
     )
     conn.commit()
@@ -572,29 +643,26 @@ def admin_root():
 
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
-def admin_dashboard_page(request: Request,
-                         authorization: str | None = Header(None)):
+def admin_dashboard_page(request: Request, authorization: str | None = Header(None)):
     user = get_current_user(request, authorization)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "root"):
         return _redirect("/user/send")
 
-    resp = templates.TemplateResponse("admin_dashboard.html", {
-        "request": request,
-        "username": user["sub"]
-    })
+    resp = templates.TemplateResponse(
+        "admin_dashboard.html",
+        {"request": request, "username": user["sub"], "role": user.get("role")},
+    )
     return _no_store(resp)
 
 
 @app.get("/admin/complaints", response_class=HTMLResponse)
-def admin_complaints_page(request: Request,
-                          authorization: str | None = Header(None)):
+def admin_complaints_page(request: Request, authorization: str | None = Header(None)):
     user = get_current_user(request, authorization)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "root"):
         return _redirect("/user/send")
 
     conn = db()
-    rows = conn.execute(
-        "SELECT * FROM complaints ORDER BY created_at DESC").fetchall()
+    rows = conn.execute("SELECT * FROM complaints ORDER BY created_at DESC").fetchall()
 
     complaints = []
     for r in rows:
@@ -611,56 +679,195 @@ def admin_complaints_page(request: Request,
         {
             "request": request,
             "username": user["sub"],
-            "complaints": complaints
+            "role": user.get("role"),
+            "complaints": complaints,
         },
     )
     return _no_store(resp)
 
 
-@app.post("/admin/update-status")
-def admin_update_status(
-        request: Request,
-        complaint_id: int = Form(...),
-        status: str = Form(...),
-        authorization: str | None = Header(None),
-):
+# ======================
+# ROOT: USER MANAGEMENT
+# ======================
+@app.get("/admin/users", response_class=HTMLResponse)
+def admin_users_page(request: Request, authorization: str | None = Header(None)):
     user = get_current_user(request, authorization)
-    if user.get("role") != "admin":
-        return _redirect("/user/send")
+    if user.get("role") != "root":
+        return _redirect("/admin/dashboard")
 
     conn = db()
-    conn.execute("UPDATE complaints SET status = ? WHERE id = ?",
-                 (status, complaint_id))
+    rows = conn.execute(
+        "SELECT id, username, role FROM users ORDER BY id ASC"
+    ).fetchall()
+    users = [dict(r) for r in rows]
+
+    resp = templates.TemplateResponse(
+        "admin_users.html",
+        {
+            "request": request,
+            "username": user["sub"],
+            "role": user.get("role"),
+            "users": users,
+            "error": request.query_params.get("error"),
+            "success": request.query_params.get("success"),
+        },
+    )
+    return _no_store(resp)
+
+
+@app.post("/admin/users/create")
+def admin_users_create(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    user_type: str = Form(...),
+    authorization: str | None = Header(None),
+):
+    user = get_current_user(request, authorization)
+    if user.get("role") != "root":
+        return _redirect("/admin/dashboard")
+
+    username = (username or "").strip()
+    if not username:
+        return _redirect("/admin/users?error=Username ว่าง")
+
+    if password != confirm_password:
+        return _redirect("/admin/users?error=รหัสผ่านไม่ตรงกัน")
+
+    if user_type not in ("student", "admin"):
+        return _redirect("/admin/users?error=เลือกประเภทผู้ใช้ไม่ถูกต้อง")
+
+    if username == "admin":
+        return _redirect("/admin/users?error=ห้ามสร้างชื่อผู้ใช้ admin ซ้ำ")
+
+    conn = db()
+    try:
+        conn.execute(
+            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            (username, hash_password(password), user_type),
+        )
+        conn.commit()
+    except Exception:
+        return _redirect("/admin/users?error=Username ซ้ำ")
+
+    return _redirect("/admin/users?success=สร้างผู้ใช้สำเร็จ")
+
+
+@app.post("/admin/users/delete")
+def admin_users_delete(
+    request: Request,
+    user_id: int = Form(...),
+    authorization: str | None = Header(None),
+):
+    user = get_current_user(request, authorization)
+    if user.get("role") != "root":
+        return _redirect("/admin/dashboard")
+
+    conn = db()
+    row = conn.execute(
+        "SELECT id, username, role FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    if not row:
+        return _redirect("/admin/users?error=ไม่พบผู้ใช้")
+
+    if row["role"] == "root" or row["username"] == "admin":
+        return _redirect("/admin/users?error=ห้ามลบ Root User")
+
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    return _redirect("/admin/users?success=ลบผู้ใช้สำเร็จ")
+
+
+# ======================
+# ROOT: DELETE COMPLAINT
+# ======================
+@app.post("/admin/delete-complaint")
+def admin_delete_complaint(
+    request: Request,
+    complaint_id: int = Form(...),
+    authorization: str | None = Header(None),
+):
+    user = get_current_user(request, authorization)
+    if user.get("role") != "root":
+        return _redirect("/admin/complaints")
+
+    conn = db()
+    conn.execute("DELETE FROM complaints WHERE id = ?", (complaint_id,))
+    conn.commit()
+    return _redirect("/admin/complaints")
+
+
+@app.post("/admin/update-status")
+async def admin_update_status(
+    request: Request,
+    complaint_id: int = Form(...),
+    status: str = Form(...),
+    work_files: list[UploadFile] = File(default=[]),
+    authorization: str | None = Header(None),
+):
+    user = get_current_user(request, authorization)
+    if user.get("role") not in ("admin", "root"):
+        return _redirect("/user/send")
+
+    valid_files = [f for f in (work_files or []) if getattr(f, "filename", "")]
+    if not valid_files:
+        raise HTTPException(400, "ต้องแนบไฟล์หน้างานก่อนอัปเดตสถานะ")
+
+    if len(valid_files) > MAX_FILES:
+        raise HTTPException(400, "แนบไฟล์ได้สูงสุด 3 ไฟล์")
+
+    # เซฟไฟล์หน้างานไว้ใน /static/uploads/work/<complaint_id>/
+    saved_paths = []
+    for f in valid_files:
+        saved_paths.append(await save_upload_file_to(f"work/{complaint_id}", f))
+
+    conn = db()
+    row = conn.execute(
+        "SELECT work_attachments FROM complaints WHERE id = ?", (complaint_id,)
+    ).fetchone()
+
+    old_list = []
+    if row:
+        try:
+            old_list = json.loads((row["work_attachments"] or "[]"))
+        except Exception:
+            old_list = []
+
+    merged = (old_list or []) + saved_paths
+
+    conn.execute(
+        "UPDATE complaints SET status = ?, work_attachments = ? WHERE id = ?",
+        (status, json.dumps(merged, ensure_ascii=False), complaint_id),
+    )
     conn.commit()
 
     return _redirect("/admin/complaints")
 
 
 @app.get("/admin/complaints")
-def admin_view_complaints(request: Request,
-                          authorization: str | None = Header(None)):
+def admin_view_complaints(request: Request, authorization: str | None = Header(None)):
     user = get_current_user(request, authorization)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "root"):
         raise HTTPException(403, "Admins only")
 
     conn = db()
-    rows = conn.execute(
-        "SELECT * FROM complaints ORDER BY created_at DESC").fetchall()
+    rows = conn.execute("SELECT * FROM complaints ORDER BY created_at DESC").fetchall()
     return [dict(r) for r in rows]
 
 
 @app.get("/admin/complaint/{complaint_id}/detail")
-def admin_complaint_detail_json(request: Request,
-                                complaint_id: int,
-                                authorization: str | None = Header(None)):
+def admin_complaint_detail_json(
+    request: Request, complaint_id: int, authorization: str | None = Header(None)
+):
     user = get_current_user(request, authorization)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "root"):
         raise HTTPException(403, "Admins only")
 
     conn = db()
     row = conn.execute(
         "SELECT * FROM complaints WHERE id = ?",
-        (complaint_id, ),
+        (complaint_id,),
     ).fetchone()
 
     if not row:
@@ -674,6 +881,11 @@ def admin_complaint_detail_json(request: Request,
     except Exception:
         attachments_list = []
 
+    try:
+        work_attachments_list = json.loads(c.get("work_attachments") or "[]")
+    except Exception:
+        work_attachments_list = []
+
     return {
         "id": c.get("id"),
         "created_at_fmt": c.get("created_at_fmt"),
@@ -683,6 +895,7 @@ def admin_complaint_detail_json(request: Request,
         "item_type": c.get("item_type"),
         "description": c.get("description"),
         "attachments": attachments_list,
+        "work_attachments": work_attachments_list,
     }
 
 
@@ -712,11 +925,11 @@ def _parse_building_from_location(loc: str) -> str:
 
 
 @app.get("/admin/dashboard/summary")
-def admin_dashboard_summary(request: Request,
-                            range: str = "week",
-                            authorization: str | None = Header(None)):
+def admin_dashboard_summary(
+    request: Request, range: str = "week", authorization: str | None = Header(None)
+):
     user = get_current_user(request, authorization)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "root"):
         raise HTTPException(403, "Admins only")
 
     days = _range_to_days(range)
@@ -730,7 +943,7 @@ def admin_dashboard_summary(request: Request,
 
     today_count = conn.execute(
         "SELECT COUNT(*) AS c FROM complaints WHERE created_at >= ?",
-        (today_start, ),
+        (today_start,),
     ).fetchone()["c"]
 
     # unresolved total (ไม่เสร็จสิ้น และไม่ยกเลิก)
@@ -739,7 +952,8 @@ def admin_dashboard_summary(request: Request,
         SELECT COUNT(*) AS c
         FROM complaints
         WHERE status NOT IN ('เสร็จสิ้น', 'ยกเลิก')
-        """, ).fetchone()["c"]
+        """,
+    ).fetchone()["c"]
 
     # series: counts per day within range
     rows = conn.execute(
@@ -751,7 +965,7 @@ def admin_dashboard_summary(request: Request,
         GROUP BY d
         ORDER BY d ASC
         """,
-        (start_ts, ),
+        (start_ts,),
     ).fetchall()
 
     series = [{"date": r["d"], "count": r["c"]} for r in rows]
@@ -768,7 +982,7 @@ def admin_dashboard_summary(request: Request,
         GROUP BY d, building, location
         ORDER BY d ASC
         """,
-        (start_ts, ),
+        (start_ts,),
     ).fetchall()
 
     # collect all dates in range (based on series span; if empty, still return empty)
@@ -797,8 +1011,7 @@ def admin_dashboard_summary(request: Request,
     # candlestick data: x=building, y=[open, high, low, close]
     candles = []
     for b, day_counts in loc_map.items():
-        counts = [day_counts.get(d, 0)
-                  for d in dates_sorted] if dates_sorted else []
+        counts = [day_counts.get(d, 0) for d in dates_sorted] if dates_sorted else []
         if not counts:
             continue
         open_v = counts[0]
@@ -819,13 +1032,13 @@ def admin_dashboard_summary(request: Request,
 
 @app.get("/admin/dashboard/location-breakdown")
 def admin_dashboard_location_breakdown(
-        request: Request,
-        range: str,
-        building: str,
-        authorization: str | None = Header(None),
+    request: Request,
+    range: str,
+    building: str,
+    authorization: str | None = Header(None),
 ):
     user = get_current_user(request, authorization)
-    if user.get("role") != "admin":
+    if user.get("role") not in ("admin", "root"):
         raise HTTPException(403, "Admins only")
 
     days = _range_to_days(range)
@@ -848,8 +1061,5 @@ def admin_dashboard_location_breakdown(
     return {
         "building": building,
         "range": range,
-        "items": [{
-            "item_type": r["item_type"],
-            "count": r["c"]
-        } for r in rows],
+        "items": [{"item_type": r["item_type"], "count": r["c"]} for r in rows],
     }

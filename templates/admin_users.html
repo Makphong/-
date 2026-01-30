@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Root - User Management</title>
+  <link rel="stylesheet" href="/static/css/web.css" />
+  <style>
+    .tabs { padding: 10px 10px 0 10px; display:flex; gap:10px; }
+    .tab { border:1px solid var(--border); background:#fff; border-radius:14px; padding:10px 14px; font-weight:900; cursor:pointer; }
+    .tab.active { background: rgba(30,115,216,.10); border-color: rgba(30,115,216,.35); color: var(--primary); }
+
+    .toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin: 10px 0; }
+    .danger { background: rgba(239,68,68,.12); color:#b91c1c; border:1px solid rgba(239,68,68,.35); }
+    .danger:hover { background: rgba(239,68,68,.18); }
+
+    .table { border:1px solid var(--border); border-radius:14px; overflow:hidden; background:#fff; }
+    .tr { display:grid; grid-template-columns: 70px 1fr 160px 160px; gap:10px; padding:12px; border-bottom:1px solid var(--border); align-items:center; }
+    .tr.head { background: rgba(0,0,0,.03); font-weight:900; }
+    .tr:last-child { border-bottom:none; }
+
+    @media (max-width: 700px){
+      .tr { grid-template-columns: 60px 1fr; }
+      .tr .colRole, .tr .colAction { grid-column: 1 / -1; }
+    }
+
+    /* modal */
+    .overlay { position:fixed; inset:0; background: rgba(0,0,0,.35); display:none; align-items:center; justify-content:center; padding:16px; }
+    .modal { width:min(520px, 100%); background:#fff; border-radius:16px; border:1px solid var(--border); padding:14px; }
+    .modalTop { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .grid { display:grid; gap:10px; margin-top:12px; }
+    .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    @media (max-width:520px){ .row2{ grid-template-columns:1fr; } }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="card">
+      <div class="topbar">
+        <div class="brand">Admin Dashboard</div>
+        <a class="link" href="/logout">ออกจากระบบ</a>
+      </div>
+
+      <div class="tabs">
+        <button class="tab" type="button" id="tabDash">Dash board</button>
+        <button class="tab" type="button" id="tabList">รายการเรื่องร้องเรียน</button>
+        <button class="tab active" type="button" id="tabUsers">จัดการผู้ใช้</button>
+      </div>
+
+      <div class="content">
+        <h2 class="title" style="margin:10px 0;">จัดการผู้ใช้ (Root เท่านั้น)</h2>
+
+        {% if error %}
+          <div class="empty" style="border:1px solid rgba(239,68,68,.35); background: rgba(239,68,68,.08); color:#b91c1c;">
+            {{ error }}
+          </div>
+        {% endif %}
+        {% if success %}
+          <div class="empty" style="border:1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#166534;">
+            {{ success }}
+          </div>
+        {% endif %}
+
+        <div class="toolbar">
+          <div class="note">Root สามารถสร้าง Student/Admin และลบผู้ใช้ (ยกเว้น Root)</div>
+          <button class="btn primary" type="button" id="openCreate">สร้างผู้ใช้</button>
+        </div>
+
+        <div class="table">
+          <div class="tr head">
+            <div>#</div>
+            <div>Username</div>
+            <div class="colRole">Role</div>
+            <div class="colAction">การทำงาน</div>
+          </div>
+
+          {% for u in users %}
+          <div class="tr">
+            <div>{{ u.id }}</div>
+            <div style="font-weight:900;">{{ u.username }}</div>
+            <div class="colRole">{{ u.role }}</div>
+            <div class="colAction">
+              {% if u.role == "root" or u.username == "admin" %}
+                <span class="badge">Root</span>
+              {% else %}
+                <form method="post" action="/admin/users/delete" style="display:inline-flex;">
+                  <input type="hidden" name="user_id" value="{{ u.id }}">
+                  <button class="btn danger" type="submit" onclick="return confirm('ยืนยันลบผู้ใช้นี้?');">ลบผู้ใช้</button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="footer">© 2025 PCCM Service. This system is developed for educational purposes.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal create -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div class="modalTop">
+        <div style="font-weight:900;">สร้างผู้ใช้</div>
+        <button class="smallBtn" type="button" id="closeCreate">ปิด</button>
+      </div>
+
+      <form method="post" action="/admin/users/create" class="grid">
+        <div>
+          <div class="label">Username</div>
+          <input class="input" name="username" required />
+        </div>
+
+        <div class="row2">
+          <div>
+            <div class="label">Password</div>
+            <input class="input" type="password" name="password" required />
+          </div>
+          <div>
+            <div class="label">Confirm Password</div>
+            <input class="input" type="password" name="confirm_password" required />
+          </div>
+        </div>
+
+        <div>
+          <div class="label">ประเภทผู้ใช้</div>
+          <select class="input" name="user_type" required>
+            <option value="student">Student</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        <button class="btn primary" type="submit">สร้างบัญชี</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("tabDash").addEventListener("click", () => window.location.replace("/admin/dashboard"));
+    document.getElementById("tabList").addEventListener("click", () => window.location.replace("/admin/complaints"));
+    document.getElementById("tabUsers").addEventListener("click", () => window.location.replace("/admin/users"));
+
+    const overlay = document.getElementById("overlay");
+    document.getElementById("openCreate").addEventListener("click", () => overlay.style.display = "flex");
+    document.getElementById("closeCreate").addEventListener("click", () => overlay.style.display = "none");
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.style.display = "none"; });
+  </script>
+</body>
+</html>

@@ -1,7 +1,6 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin - Dashboard</title>
@@ -9,263 +8,308 @@
     <!-- ApexCharts (Interactive candlestick + line + bar) -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <style>
-        .tabs {
-            padding: 10px 10px 0 10px;
-            display: flex;
-            gap: 10px;
-        }
+      .tabs {
+        padding: 10px 10px 0 10px;
+        display: flex;
+        gap: 10px;
+      }
 
-        .tab {
-            border: 1px solid var(--border);
-            background: #fff;
-            border-radius: 14px;
-            padding: 10px 14px;
-            font-weight: 900;
-            cursor: pointer;
-        }
+      .tab {
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 14px;
+        padding: 10px 14px;
+        font-weight: 900;
+        cursor: pointer;
+      }
 
-        .tab.active {
-            background: rgba(30, 115, 216, .10);
-            border-color: rgba(30, 115, 216, .35);
-            color: var(--primary);
-        }
+      .tab.active {
+        background: rgba(30, 115, 216, 0.1);
+        border-color: rgba(30, 115, 216, 0.35);
+        color: var(--primary);
+      }
 
+      .dashGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      @media (max-width: 768px) {
         .dashGrid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-top: 12px;
+          grid-template-columns: 1fr;
         }
+      }
 
-        @media (max-width: 768px) {
-            .dashGrid {
-                grid-template-columns: 1fr;
-            }
-        }
+      .statCard {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px;
+        background: #fff;
+      }
 
-        .statCard {
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 14px;
-            background: #fff;
-        }
+      .statLabel {
+        color: var(--muted);
+        font-weight: 800;
+      }
 
-        .statLabel {
-            color: var(--muted);
-            font-weight: 800;
-        }
+      .statValue {
+        font-size: 34px;
+        font-weight: 900;
+        margin-top: 6px;
+      }
 
-        .statValue {
-            font-size: 34px;
-            font-weight: 900;
-            margin-top: 6px;
-        }
+      .chartCard {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 14px;
+        background: #fff;
+        margin-top: 12px;
+      }
 
-        .chartCard {
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 14px;
-            background: #fff;
-            margin-top: 12px;
-        }
+      .chartTop {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
 
-        .chartTop {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 10px;
-        }
+      .chartTitle {
+        font-weight: 900;
+      }
 
-        .chartTitle {
-            font-weight: 900;
-        }
+      .rangeSelect {
+        min-width: 220px;
+      }
 
-        .rangeSelect {
-            min-width: 220px;
-        }
-
-        .note {
-            color: var(--muted);
-            font-weight: 700;
-            font-size: 13px;
-        }
+      .note {
+        color: var(--muted);
+        font-weight: 700;
+        font-size: 13px;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="app">
-        <div class="card">
-            <div class="topbar">
-                <div class="brand">Admin Dashboard</div>
-                <a class="link" href="/logout">ออกจากระบบ</a>
+      <div class="card">
+        <div class="topbar">
+          <div class="brand">Admin Dashboard</div>
+          <a class="link" href="/logout">ออกจากระบบ</a>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" type="button" id="tabDash">
+            Dash board
+          </button>
+          <button class="tab" type="button" id="tabList">
+            รายการเรื่องร้องเรียน
+          </button>
+          {% if role == "root" %}
+          <button class="tab" type="button" id="tabUsers">จัดการผู้ใช้</button>
+          {% endif %}
+        </div>
+
+        <div class="content">
+          <div class="dashGrid">
+            <div class="statCard">
+              <div class="statLabel">จำนวนรายการร้องเรียนประจำวัน</div>
+              <div class="statValue" id="todayCount">-</div>
             </div>
-
-            <div class="tabs">
-                <button class="tab active" type="button" id="tabDash">Dash board</button>
-                <button class="tab" type="button" id="tabList">รายการเรื่องร้องเรียน</button>
+            <div class="statCard">
+              <div class="statLabel">
+                จำนวนรายการร้องเรียนที่ยังไม่เสร็จทั้งหมด
+              </div>
+              <div class="statValue" id="unresolvedTotal">-</div>
             </div>
+          </div>
 
-            <div class="content">
-                <div class="dashGrid">
-                    <div class="statCard">
-                        <div class="statLabel">จำนวนรายการร้องเรียนประจำวัน</div>
-                        <div class="statValue" id="todayCount">-</div>
-                    </div>
-                    <div class="statCard">
-                        <div class="statLabel">จำนวนรายการร้องเรียนที่ยังไม่เสร็จทั้งหมด</div>
-                        <div class="statValue" id="unresolvedTotal">-</div>
-                    </div>
-                </div>
+          <div class="chartCard">
+            <div class="chartTop">
+              <div>
+                <div class="chartTitle">กราฟแสดงจำนวนเคสรายงาน</div>
+                <!-- <div class="note">เลือกกรอบเวลา: รายสัปดาห์ / รายเดือน / รายสามเดือน / รายปี</div> -->
+              </div>
+              <select class="rangeSelect" id="rangeSelect1">
+                <option value="week">รายสัปดาห์</option>
+                <option value="month">รายเดือน</option>
+                <option value="3month">รายสามเดือน</option>
+                <option value="year">รายปี</option>
+              </select>
+            </div>
+            <div id="lineChart"></div>
+          </div>
 
-                <div class="chartCard">
-                    <div class="chartTop">
-                        <div>
-                            <div class="chartTitle">กราฟแสดงจำนวนเคสรายงาน</div>
-                            <!-- <div class="note">เลือกกรอบเวลา: รายสัปดาห์ / รายเดือน / รายสามเดือน / รายปี</div> -->
-                        </div>
-                        <select class="rangeSelect" id="rangeSelect1">
-                            <option value="week">รายสัปดาห์</option>
-                            <option value="month">รายเดือน</option>
-                            <option value="3month">รายสามเดือน</option>
-                            <option value="year">รายปี</option>
-                        </select>
-                    </div>
-                    <div id="lineChart"></div>
-                </div>
-
-                <div class="chartCard">
-                    <div class="chartTop">
-                        <div>
-                            <div class="chartTitle">กราฟแท่งเทียนตามสถานที่ (อาคาร)</div>
-                            <!-- <div class="note">แท่งเทียนคำนวณจากจำนวนเคสรายวันของแต่ละอาคาร</div> -->
-                        </div>
-                        <!-- <select class="rangeSelect" id="rangeSelect2">
+          <div class="chartCard">
+            <div class="chartTop">
+              <div>
+                <div class="chartTitle">กราฟแท่งเทียนตามสถานที่ (อาคาร)</div>
+                <!-- <div class="note">แท่งเทียนคำนวณจากจำนวนเคสรายวันของแต่ละอาคาร</div> -->
+              </div>
+              <!-- <select class="rangeSelect" id="rangeSelect2">
                             <option value="week">รายสัปดาห์</option>
                             <option value="month">รายเดือน</option>
                             <option value="3month">รายสามเดือน</option>
                             <option value="year">รายปี</option>
                         </select> -->
-                    </div>
-                    <div id="candleChart"></div>
-                    <div style="margin-top:12px;">
-                        <div class="chartTitle" id="drillTitle" style="display:none;">จำนวนหมวดประเภทสิ่งของของสถานที่:
-                            <span id="drillBuilding"></span>
-                        </div>
-                        <div id="barChart"></div>
-                    </div>
-                </div>
-
-                <div class="footer">© 2025 PCCM Service. This system is developed for educational purposes.</div>
             </div>
+            <div id="candleChart"></div>
+            <div style="margin-top: 12px">
+              <div class="chartTitle" id="drillTitle" style="display: none">
+                จำนวนหมวดประเภทสิ่งของของสถานที่:
+                <span id="drillBuilding"></span>
+              </div>
+              <div id="barChart"></div>
+            </div>
+          </div>
+
+          <div class="footer">
+            © 2025 PCCM Service. This system is developed for educational
+            purposes.
+          </div>
         </div>
+      </div>
     </div>
 
     <script>
-        // tabs
-        document.getElementById("tabDash").addEventListener("click", () => window.location.replace("/admin/dashboard"));
-        document.getElementById("tabList").addEventListener("click", () => window.location.replace("/admin/complaints"));
+      // tabs
+      document
+        .getElementById("tabDash")
+        .addEventListener("click", () =>
+          window.location.replace("/admin/dashboard"),
+        );
+      document
+        .getElementById("tabList")
+        .addEventListener("click", () =>
+          window.location.replace("/admin/complaints"),
+        );
+      document
+        .getElementById("tabUsers")
+        ?.addEventListener("click", () =>
+          window.location.replace("/admin/users"),
+        );
 
-        const todayEl = document.getElementById("todayCount");
-        const unresolvedEl = document.getElementById("unresolvedTotal");
+      const todayEl = document.getElementById("todayCount");
+      const unresolvedEl = document.getElementById("unresolvedTotal");
 
-        let lineChart = null;
-        let candleChart = null;
-        let barChart = null;
+      let lineChart = null;
+      let candleChart = null;
+      let barChart = null;
 
-        function buildLine(series) {
-            const categories = series.map(x => x.date);
-            const data = series.map(x => x.count);
+      function buildLine(series) {
+        const categories = series.map((x) => x.date);
+        const data = series.map((x) => x.count);
 
-            const options = {
-                chart: { type: "area", height: 280, toolbar: { show: false } },
-                series: [{ name: "จำนวนเคส", data }],
-                xaxis: { categories },
-                dataLabels: { enabled: false },
-                stroke: { curve: "smooth" },
-            };
+        const options = {
+          chart: { type: "area", height: 280, toolbar: { show: false } },
+          series: [{ name: "จำนวนเคส", data }],
+          xaxis: { categories },
+          dataLabels: { enabled: false },
+          stroke: { curve: "smooth" },
+        };
 
-            if (lineChart) { lineChart.destroy(); }
-            lineChart = new ApexCharts(document.querySelector("#lineChart"), options);
-            lineChart.render();
+        if (lineChart) {
+          lineChart.destroy();
         }
+        lineChart = new ApexCharts(
+          document.querySelector("#lineChart"),
+          options,
+        );
+        lineChart.render();
+      }
 
-        function buildCandle(candles, range) {
-            const options = {
-                chart: {
-                    type: "candlestick",
-                    height: 320,
-                    toolbar: { show: false },
-                    events: {
-                        dataPointSelection: async function (event, chartContext, config) {
-                            const idx = config.dataPointIndex;
-                            const item = candles[idx];
-                            if (!item) return;
-                            await loadBreakdown(range, item.x);
-                        }
-                    }
-                },
-                series: [{ name: "สถานที่", data: candles }],
-                xaxis: { type: "category" }
-            };
+      function buildCandle(candles, range) {
+        const options = {
+          chart: {
+            type: "candlestick",
+            height: 320,
+            toolbar: { show: false },
+            events: {
+              dataPointSelection: async function (event, chartContext, config) {
+                const idx = config.dataPointIndex;
+                const item = candles[idx];
+                if (!item) return;
+                await loadBreakdown(range, item.x);
+              },
+            },
+          },
+          series: [{ name: "สถานที่", data: candles }],
+          xaxis: { type: "category" },
+        };
 
-            if (candleChart) { candleChart.destroy(); }
-            candleChart = new ApexCharts(document.querySelector("#candleChart"), options);
-            candleChart.render();
+        if (candleChart) {
+          candleChart.destroy();
         }
+        candleChart = new ApexCharts(
+          document.querySelector("#candleChart"),
+          options,
+        );
+        candleChart.render();
+      }
 
-        function buildBar(items) {
-            const categories = items.map(x => x.item_type);
-            const data = items.map(x => x.count);
+      function buildBar(items) {
+        const categories = items.map((x) => x.item_type);
+        const data = items.map((x) => x.count);
 
-            const options = {
-                chart: { type: "bar", height: 260, toolbar: { show: false } },
-                series: [{ name: "จำนวน", data }],
-                xaxis: { categories },
-                dataLabels: { enabled: false },
-            };
+        const options = {
+          chart: { type: "bar", height: 260, toolbar: { show: false } },
+          series: [{ name: "จำนวน", data }],
+          xaxis: { categories },
+          dataLabels: { enabled: false },
+        };
 
-            if (barChart) { barChart.destroy(); }
-            barChart = new ApexCharts(document.querySelector("#barChart"), options);
-            barChart.render();
+        if (barChart) {
+          barChart.destroy();
         }
+        barChart = new ApexCharts(document.querySelector("#barChart"), options);
+        barChart.render();
+      }
 
-        async function loadSummary(range) {
-            const res = await fetch(`/admin/dashboard/summary?range=${encodeURIComponent(range)}`);
-            const d = await res.json();
-            todayEl.textContent = d.today_count ?? "-";
-            unresolvedEl.textContent = d.unresolved_total ?? "-";
-            buildLine(d.series || []);
-            buildCandle(d.candles || [], range);
+      async function loadSummary(range) {
+        const res = await fetch(
+          `/admin/dashboard/summary?range=${encodeURIComponent(range)}`,
+        );
+        const d = await res.json();
+        todayEl.textContent = d.today_count ?? "-";
+        unresolvedEl.textContent = d.unresolved_total ?? "-";
+        buildLine(d.series || []);
+        buildCandle(d.candles || [], range);
 
-            // reset drilldown
-            document.getElementById("drillTitle").style.display = "none";
-            document.getElementById("drillBuilding").textContent = "";
-            if (barChart) { barChart.destroy(); barChart = null; }
-            document.querySelector("#barChart").innerHTML = "";
+        // reset drilldown
+        document.getElementById("drillTitle").style.display = "none";
+        document.getElementById("drillBuilding").textContent = "";
+        if (barChart) {
+          barChart.destroy();
+          barChart = null;
         }
+        document.querySelector("#barChart").innerHTML = "";
+      }
 
-        async function loadBreakdown(range, building) {
-            const res = await fetch(`/admin/dashboard/location-breakdown?range=${encodeURIComponent(range)}&building=${encodeURIComponent(building)}`);
-            const d = await res.json();
-            document.getElementById("drillTitle").style.display = "block";
-            document.getElementById("drillBuilding").textContent = building;
-            buildBar(d.items || []);
-            document.querySelector("#barChart").scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+      async function loadBreakdown(range, building) {
+        const res = await fetch(
+          `/admin/dashboard/location-breakdown?range=${encodeURIComponent(range)}&building=${encodeURIComponent(building)}`,
+        );
+        const d = await res.json();
+        document.getElementById("drillTitle").style.display = "block";
+        document.getElementById("drillBuilding").textContent = building;
+        buildBar(d.items || []);
+        document
+          .querySelector("#barChart")
+          .scrollIntoView({ behavior: "smooth", block: "start" });
+      }
 
-        const r1 = document.getElementById("rangeSelect1");
+      const r1 = document.getElementById("rangeSelect1");
 
-        // dropdown ตัวเดียว คุมทั้ง line + candlestick
-        r1.addEventListener("change", async () => {
-            await loadSummary(r1.value);
-        });
+      // dropdown ตัวเดียว คุมทั้ง line + candlestick
+      r1.addEventListener("change", async () => {
+        await loadSummary(r1.value);
+      });
 
-        // init
-        loadSummary("week");
-
+      // init
+      loadSummary("week");
     </script>
-</body>
-
+  </body>
 </html>

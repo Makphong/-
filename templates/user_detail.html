@@ -1,113 +1,150 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>รายละเอียดคำร้อง</title>
+    <link rel="stylesheet" href="/static/css/web.css" />
+  </head>
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>รายละเอียดคำร้อง</title>
-  <link rel="stylesheet" href="/static/css/web.css" />
-</head>
-
-<body>
-  <div class="app">
-    <div class="card">
-      <div class="topbar">
-        <div class="brand">PCCM Service</div>
-        <a class="link" href="/logout">ออกจากระบบ</a>
-      </div>
-
-      <div class="content">
-        <h2 class="title">รายละเอียดคำร้อง</h2>
-
-        <div class="detailGrid">
-          <div class="detailBox">
-            <div class="label">วันที่แจ้ง</div>
-            <div class="value">{{ c.created_at_fmt }}</div>
-          </div>
-          <div class="detailBox">
-            <div class="label">สถานที่</div>
-            <div class="value">{{ c.location or "-" }}</div>
-          </div>
-          <div class="detailBox">
-            <div class="label">ประเภทสิ่งของ</div>
-            <div class="value">{{ c.item_type or "-" }}</div>
-          </div>
-          <div class="detailBox">
-            <div class="label">สถานะ</div>
-            <div class="badge">{{ c.status or "-" }}</div>
-          </div>
+  <body>
+    <div class="app">
+      <div class="card">
+        <div class="topbar">
+          <div class="brand">PCCM Service</div>
+          <a class="link" href="/logout">ออกจากระบบ</a>
         </div>
 
-        <div class="detailBox" style="margin-top:12px;">
-          <div class="label">รายละเอียดปัญหา</div>
-          <div class="value" style="white-space:pre-wrap;">{{ c.description or "-" }}</div>
-        </div>
+        <div class="content">
+          <h2 class="title">รายละเอียดคำร้อง</h2>
 
-        <div class="detailBox" style="margin-top:12px;">
-          <div class="label">ไฟล์แนบ</div>
-          {% if c.attachments_list|length == 0 %}
-          <div class="value">ไม่มีไฟล์แนบ</div>
-          {% else %}
-          <div class="previewGrid">
-            {% for p in c.attachments_list %}
-            {% if p.lower().endswith('.mp4') %}
-            <div class="previewCard">
-              <div class="previewMedia">
-                <video class="media" controls src="{{ p }}"></video>
-              </div>
-              <div class="previewMeta">
-                <div class="name">{{ p.split('/')[-1] }}</div>
-              </div>
+          <div class="detailGrid">
+            <div class="detailBox">
+              <div class="label">วันที่แจ้ง</div>
+              <div class="value">{{ c.created_at_fmt }}</div>
             </div>
+            <div class="detailBox">
+              <div class="label">สถานที่</div>
+              <div class="value">{{ c.location or "-" }}</div>
+            </div>
+            <div class="detailBox">
+              <div class="label">ประเภทสิ่งของ</div>
+              <div class="value">{{ c.item_type or "-" }}</div>
+            </div>
+            <div class="detailBox">
+              <div class="label">สถานะ</div>
+              <div class="badge">{{ c.status or "-" }}</div>
+            </div>
+          </div>
+
+          <div class="detailBox" style="margin-top: 12px">
+            <div class="label">รายละเอียดปัญหา</div>
+            <div class="value" style="white-space: pre-wrap">
+              {{ c.description or "-" }}
+            </div>
+          </div>
+
+          <div class="detailBox" style="margin-top: 12px">
+            <div class="label">ไฟล์แนบ</div>
+            {% if c.attachments_list|length == 0 %}
+            <div class="value">ไม่มีไฟล์แนบ</div>
             {% else %}
-            <div class="previewCard">
-              <div class="previewMedia">
-                <img class="media" src="{{ p }}" alt="attachment" />
+            <div class="previewGrid">
+              {% for p in c.attachments_list %} {% if p.lower().endswith('.mp4')
+              %}
+              <div class="previewCard">
+                <div class="previewMedia">
+                  <video class="media" controls src="{{ p }}"></video>
+                </div>
+                <div class="previewMeta">
+                  <div class="name">{{ p.split('/')[-1] }}</div>
+                </div>
               </div>
-              <div class="previewMeta">
-                <div class="name">{{ p.split('/')[-1] }}</div>
+              {% else %}
+              <div class="previewCard">
+                <div class="previewMedia">
+                  <img class="media" src="{{ p }}" alt="attachment" />
+                </div>
+                <div class="previewMeta">
+                  <div class="name">{{ p.split('/')[-1] }}</div>
+                </div>
               </div>
+              {% endif %} {% endfor %}
             </div>
             {% endif %}
-            {% endfor %}
           </div>
-          {% endif %}
-        </div>
 
-        <div class="actions" style="margin-top:14px;">
-          <a class="btn outline" href="/user/track">กลับไปหน้าติดตาม</a>
-        </div>
+          <div class="detailBox" style="margin-top: 12px">
+            <div class="label">ไฟล์หน้างาน (หลักฐานการดำเนินงาน)</div>
+            {% if c.work_attachments_list|length == 0 %}
+            <div class="value">ยังไม่มีไฟล์หน้างาน</div>
+            {% else %}
+            <div class="previewGrid">
+              {% for p in c.work_attachments_list %} {% if
+              p.lower().endswith('.mp4') %}
+              <div class="previewCard">
+                <div class="previewMedia">
+                  <video class="media" controls src="{{ p }}"></video>
+                </div>
+                <div class="previewMeta">
+                  <div class="name">{{ p.split('/')[-1] }}</div>
+                </div>
+              </div>
+              {% else %}
+              <div class="previewCard">
+                <div class="previewMedia">
+                  <img class="media" src="{{ p }}" alt="work-attachment" />
+                </div>
+                <div class="previewMeta">
+                  <div class="name">{{ p.split('/')[-1] }}</div>
+                </div>
+              </div>
+              {% endif %} {% endfor %}
+            </div>
+            {% endif %}
+          </div>
 
-        <div class="footer">© 2025 PCCM Service. This system is developed for educational purposes.</div>
+          <div class="actions" style="margin-top: 14px">
+            <a class="btn outline" href="/user/track">กลับไปหน้าติดตาม</a>
+          </div>
+
+          <div class="footer">
+            © 2025 PCCM Service. This system is developed for educational
+            purposes.
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <script>
-    function getCookie(name) {
-      const v = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith(name + "="));
-      return v ? decodeURIComponent(v.split("=", 2)[1]) : "";
-    }
-    function enforceRole() {
-      const loggedIn = getCookie("logged_in") === "1";
-      const role = getCookie("user_role");
-      const path = location.pathname;
-
-      if (!loggedIn) return;
-
-      if (role === "admin" && !path.startsWith("/admin")) {
-        location.replace("/admin");
-        return;
+    <script>
+      function getCookie(name) {
+        const v = document.cookie
+          .split(";")
+          .map((x) => x.trim())
+          .find((x) => x.startsWith(name + "="));
+        return v ? decodeURIComponent(v.split("=", 2)[1]) : "";
       }
-      if (role === "user" && path.startsWith("/admin")) {
-        location.replace("/user/send");
-        return;
+      function enforceRole() {
+        const loggedIn = getCookie("logged_in") === "1";
+        const role = getCookie("user_role");
+        const path = location.pathname;
+
+        if (!loggedIn) return;
+
+        if (
+          (role === "admin" || role === "root") &&
+          !path.startsWith("/admin")
+        ) {
+          location.replace("/admin");
+          return;
+        }
+        if (role === "student" && path.startsWith("/admin")) {
+          location.replace("/user/send");
+          return;
+        }
       }
-    }
-    window.addEventListener("pageshow", enforceRole);
-    window.addEventListener("popstate", enforceRole);
-  </script>
-
-</body>
-
+      window.addEventListener("pageshow", enforceRole);
+      window.addEventListener("popstate", enforceRole);
+    </script>
+  </body>
 </html>

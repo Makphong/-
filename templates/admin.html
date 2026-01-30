@@ -1,684 +1,1086 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin - Complaints</title>
     <link rel="stylesheet" href="/static/css/web.css" />
     <style>
-        .tabs {
-            padding: 10px 10px 0 10px;
-            display: flex;
-            gap: 10px;
-        }
+      /* ===== Complaint Detail Layout (Desktop 2 columns) ===== */
+      .detailSplit {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-top: 12px;
+      }
 
-        .tab {
-            border: 1px solid var(--border);
-            background: #fff;
-            border-radius: 14px;
-            padding: 10px 14px;
-            font-weight: 900;
-            cursor: pointer;
+      @media (min-width: 900px) {
+        .detailSplit {
+          grid-template-columns: 1fr 1fr;
+          align-items: start;
         }
+      }
 
-        .tab.active {
-            background: rgba(30, 115, 216, .10);
-            border-color: rgba(30, 115, 216, .35);
-            color: var(--primary);
-        }
+      /* ===== Media Slider ===== */
+      .mediaSlider {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: #fff;
+        overflow: hidden;
+      }
 
-        .listItem.clickable {
-            cursor: pointer;
-        }
+      .mediaSliderTop {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+      }
 
-        .listItem.clickable:hover {
-            border-color: rgba(30, 115, 216, .35);
-            background: rgba(30, 115, 216, .04);
-        }
+      .mediaSliderCounter {
+        font-weight: 900;
+        color: var(--muted);
+      }
 
-        .listItem.selected {
-            border-color: rgba(30, 115, 216, .45);
-            background: rgba(30, 115, 216, .06);
-        }
+      .mediaSlide {
+        display: none;
+        padding: 10px 12px 12px 12px;
+      }
+      .mediaSlide.active {
+        display: block;
+      }
 
-        .inlineDetail {
-            margin-top: 10px;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 12px;
-            background: #fff;
-        }
+      .media {
+        width: 100%;
+        max-height: 360px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        object-fit: contain;
+      }
 
-        .inlineDetailHeader {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 10px;
-        }
+      .sliderNavBtn {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #fff;
+        cursor: pointer;
+        font-weight: 900;
+      }
 
-        .smallBtn {
-            padding: 9px 12px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            background: #fff;
-            cursor: pointer;
-            font-weight: 800;
-        }
+      /* ===== Proof Upload (brown box) ===== */
+      .proofUpload {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 14px;
+        border: 1px dashed rgba(30, 115, 216, 0.45);
+        background: rgba(30, 115, 216, 0.04);
+        cursor: pointer;
+        font-weight: 900;
+        min-width: 220px;
+      }
+      .proofUpload input[type="file"] {
+        display: none;
+      }
+      .proofHint {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 6px;
+      }
 
-        .adminUpdateRow {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            justify-content: flex-end;
-            margin-top: 12px;
-            flex-wrap: wrap;
-        }
+      .btn.danger {
+        background: rgba(239, 68, 68, 0.12);
+        color: #b91c1c;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+      }
 
-        /* ===== Status Colors ===== */
-        .badge.status-wait {
-            border-color: rgba(239, 68, 68, .35);
-            background: rgba(239, 68, 68, .10);
-            color: #b91c1c;
-        }
+      .tabs {
+        padding: 10px 10px 0 10px;
+        display: flex;
+        gap: 10px;
+      }
 
-        .badge.status-progress {
-            border-color: rgba(234, 179, 8, .45);
-            background: rgba(234, 179, 8, .18);
-            color: #854d0e;
-        }
+      .tab {
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 14px;
+        padding: 10px 14px;
+        font-weight: 900;
+        cursor: pointer;
+      }
 
-        .badge.status-done {
-            border-color: rgba(34, 197, 94, .35);
-            background: rgba(34, 197, 94, .12);
-            color: #166534;
-        }
+      .tab.active {
+        background: rgba(30, 115, 216, 0.1);
+        border-color: rgba(30, 115, 216, 0.35);
+        color: var(--primary);
+      }
 
-        .statusSelect {
-            min-width: 220px;
-            font-weight: 900;
-        }
+      .listItem.clickable {
+        cursor: pointer;
+      }
 
-        .statusSelect.status-wait {
-            border-color: rgba(239, 68, 68, .45);
-            box-shadow: 0 0 0 4px rgba(239, 68, 68, .10);
-            color: #b91c1c;
-        }
+      .listItem.clickable:hover {
+        border-color: rgba(30, 115, 216, 0.35);
+        background: rgba(30, 115, 216, 0.04);
+      }
 
-        .statusSelect.status-progress {
-            border-color: rgba(234, 179, 8, .55);
-            box-shadow: 0 0 0 4px rgba(234, 179, 8, .12);
-            color: #854d0e;
-        }
+      .listItem.selected {
+        border-color: rgba(30, 115, 216, 0.45);
+        background: rgba(30, 115, 216, 0.06);
+      }
 
-        .statusSelect.status-done {
-            border-color: rgba(34, 197, 94, .45);
-            box-shadow: 0 0 0 4px rgba(34, 197, 94, .10);
-            color: #166534;
-        }
+      .inlineDetail {
+        margin-top: 10px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        background: #fff;
+      }
 
-        /* ===== Filter UI (Responsive + Scroll) ===== */
-        .headerRow {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
+      .inlineDetailHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
 
-        .filterBtn {
-            width: 42px;
-            height: 42px;
-            border-radius: 14px;
-            border: 1px solid var(--border);
-            background: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            flex: 0 0 auto;
-        }
+      .smallBtn {
+        padding: 9px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #fff;
+        cursor: pointer;
+        font-weight: 800;
+      }
 
-        .filterBtn:hover {
-            border-color: rgba(30, 115, 216, .35);
-            background: rgba(30, 115, 216, .05);
-        }
+      .adminUpdateRow {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: flex-end;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
 
-        .filterOverlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, .38);
-            display: none;
-            align-items: flex-start;
-            justify-content: center;
-            padding: 16px 12px;
-            z-index: 9999;
-            overflow: auto;
-            /* overlay scroll ได้ */
-        }
+      /* ===== Status Colors ===== */
+      .badge.status-wait {
+        border-color: rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.1);
+        color: #b91c1c;
+      }
 
+      .badge.status-progress {
+        border-color: rgba(234, 179, 8, 0.45);
+        background: rgba(234, 179, 8, 0.18);
+        color: #854d0e;
+      }
+
+      .badge.status-done {
+        border-color: rgba(34, 197, 94, 0.35);
+        background: rgba(34, 197, 94, 0.12);
+        color: #166534;
+      }
+
+      .statusSelect {
+        min-width: 220px;
+        font-weight: 900;
+      }
+
+      .statusSelect.status-wait {
+        border-color: rgba(239, 68, 68, 0.45);
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+        color: #b91c1c;
+      }
+
+      .statusSelect.status-progress {
+        border-color: rgba(234, 179, 8, 0.55);
+        box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.12);
+        color: #854d0e;
+      }
+
+      .statusSelect.status-done {
+        border-color: rgba(34, 197, 94, 0.45);
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
+        color: #166534;
+      }
+
+      /* ===== Filter UI (Responsive + Scroll) ===== */
+      .headerRow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .filterBtn {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex: 0 0 auto;
+      }
+
+      .filterBtn:hover {
+        border-color: rgba(30, 115, 216, 0.35);
+        background: rgba(30, 115, 216, 0.05);
+      }
+
+      .filterOverlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.38);
+        display: none;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 16px 12px;
+        z-index: 9999;
+        overflow: auto;
+        /* overlay scroll ได้ */
+      }
+
+      .filterPanel {
+        width: 560px;
+        max-width: 94vw;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+        padding: 14px;
+
+        /* เปลี่ยนให้เป็น layout แบบ column แล้วให้ body เป็นตัว scroll */
+        display: flex;
+        flex-direction: column;
+
+        max-height: calc(100vh - 32px);
+        overflow: hidden;
+        /* ห้าม panel scroll โดยตรง */
+      }
+
+      @media (max-width: 480px) {
         .filterPanel {
-            width: 560px;
-            max-width: 94vw;
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            box-shadow: var(--shadow);
-            padding: 14px;
-
-            /* เปลี่ยนให้เป็น layout แบบ column แล้วให้ body เป็นตัว scroll */
-            display: flex;
-            flex-direction: column;
-
-            max-height: calc(100vh - 32px);
-            overflow: hidden;
-            /* ห้าม panel scroll โดยตรง */
+          width: 100%;
+          max-width: 100%;
+          border-radius: 16px;
         }
+      }
 
-        @media (max-width: 480px) {
-            .filterPanel {
-                width: 100%;
-                max-width: 100%;
-                border-radius: 16px;
-            }
-        }
+      .filterPanel h3 {
+        margin: 0;
+        font-size: 18px;
+      }
 
-        .filterPanel h3 {
-            margin: 0;
-            font-size: 18px;
-        }
+      .filterTop {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
 
-        .filterTop {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
+        /* ไม่ใช้ sticky แล้ว เพื่อกันทะลุ header */
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border);
+        background: #fff;
+      }
 
-            /* ไม่ใช้ sticky แล้ว เพื่อกันทะลุ header */
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--border);
-            background: #fff;
-        }
+      .chipRow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+      }
 
-        .chipRow {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-        }
+      .checkGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 10px;
+      }
 
+      @media (max-width: 480px) {
         .checkGrid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
+          grid-template-columns: 1fr;
         }
+      }
 
-        @media (max-width: 480px) {
-            .checkGrid {
-                grid-template-columns: 1fr;
-            }
-        }
+      .checkItem {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 10px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
 
-        .checkItem {
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 10px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
+      .filterBody {
+        /* ส่วนนี้เท่านั้นที่ scroll */
+        overflow: auto;
+        padding-right: 4px;
+        /* กัน scrollbar ทับ */
+        flex: 1 1 auto;
+      }
 
-        .filterBody {
-            /* ส่วนนี้เท่านั้นที่ scroll */
-            overflow: auto;
-            padding-right: 4px;
-            /* กัน scrollbar ทับ */
-            flex: 1 1 auto;
-        }
+      .filterActions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 12px;
+        flex-wrap: wrap;
 
-
-
-        .filterActions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 12px;
-            flex-wrap: wrap;
-
-            /* ไม่ใช้ sticky แล้ว */
-            padding-top: 10px;
-            border-top: 1px solid var(--border);
-            background: #fff;
-        }
+        /* ไม่ใช้ sticky แล้ว */
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+        background: #fff;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="app">
-        <div class="card">
-            <div class="topbar">
-                <div class="brand">Admin Dashboard</div>
-                <a class="link" href="/logout">ออกจากระบบ</a>
-            </div>
-
-            <div class="tabs">
-                <button class="tab" type="button" id="tabDash">Dash board</button>
-                <button class="tab active" type="button" id="tabList">รายการเรื่องร้องเรียน</button>
-            </div>
-
-            <div class="content">
-                <div class="headerRow">
-                    <h2 class="title" style="margin:0;">รายการเรื่องร้องเรียน</h2>
-
-                    <button class="filterBtn" type="button" id="openFilter" aria-label="filter">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                            <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z" stroke="currentColor" stroke-width="2"
-                                stroke-linejoin="round" />
-                        </svg>
-                    </button>
-                </div>
-
-                {% if complaints|length == 0 %}
-                <div class="empty">ยังไม่มีรายการร้องเรียน</div>
-                {% else %}
-                <div id="list" class="list">
-                    {% for c in complaints %}
-                    <div class="listItem clickable" data-id="{{ c.id }}" data-status="{{ c.status or '' }}"
-                        data-building="{{ c.building or '' }}" data-itemtype="{{ c.item_type or '' }}"
-                        data-location="{{ c.location or '' }}">
-                        <div class="row">
-                            <div class="col">
-                                <div class="label">วันที่แจ้ง</div>
-                                <div class="value">{{ c.created_at_fmt }}</div>
-                            </div>
-                            <div class="col">
-                                <div class="label">ผู้ร้องเรียน</div>
-                                <div class="value">{{ c.username }}</div>
-                            </div>
-                            <div class="col">
-                                <div class="label">สถานที่</div>
-                                <div class="value">{{ c.location or "-" }}</div>
-                            </div>
-                            <div class="col">
-                                <div class="label">สถานะ</div>
-                                <div class="badge jsStatusBadge">{{ c.status or "-" }}</div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                <div class="footer">© 2025 PCCM Service. This system is developed for educational purposes.</div>
-            </div>
+      <div class="card">
+        <div class="topbar">
+          <div class="brand">Admin Dashboard</div>
+          <a class="link" href="/logout">ออกจากระบบ</a>
         </div>
+
+        <div class="tabs">
+          <button class="tab" type="button" id="tabDash">Dash board</button>
+          <button class="tab active" type="button" id="tabList">
+            รายการเรื่องร้องเรียน
+          </button>
+          {% if role == "root" %}
+          <button class="tab" type="button" id="tabUsers">จัดการผู้ใช้</button>
+          {% endif %}
+        </div>
+
+        <div class="content">
+          <div class="headerRow">
+            <h2 class="title" style="margin: 0">รายการเรื่องร้องเรียน</h2>
+
+            <button
+              class="filterBtn"
+              type="button"
+              id="openFilter"
+              aria-label="filter"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M3 5h18l-7 8v5l-4 2v-7L3 5z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {% if complaints|length == 0 %}
+          <div class="empty">ยังไม่มีรายการร้องเรียน</div>
+          {% else %}
+          <div id="list" class="list">
+            {% for c in complaints %}
+            <div
+              class="listItem clickable"
+              data-id="{{ c.id }}"
+              data-status="{{ c.status or '' }}"
+              data-building="{{ c.building or '' }}"
+              data-itemtype="{{ c.item_type or '' }}"
+              data-location="{{ c.location or '' }}"
+            >
+              <div class="row">
+                <div class="col">
+                  <div class="label">วันที่แจ้ง</div>
+                  <div class="value">{{ c.created_at_fmt }}</div>
+                </div>
+                <div class="col">
+                  <div class="label">ผู้ร้องเรียน</div>
+                  <div class="value">{{ c.username }}</div>
+                </div>
+                <div class="col">
+                  <div class="label">สถานที่</div>
+                  <div class="value">{{ c.location or "-" }}</div>
+                </div>
+                <div class="col">
+                  <div class="label">สถานะ</div>
+                  <div class="badge jsStatusBadge">{{ c.status or "-" }}</div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="footer">
+            © 2025 PCCM Service. This system is developed for educational
+            purposes.
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Filter Overlay -->
     <div class="filterOverlay" id="filterOverlay">
-        <div class="filterPanel">
-            <div class="filterTop">
-                <h3>ตัวกรองรายการ</h3>
-                <button class="smallBtn" type="button" id="closeFilter">ปิด</button>
-            </div>
-
-            <div class="filterBody">
-                <!-- STATUS -->
-                <div class="detailBox" style="margin-top:0;">
-                    <div class="label">สถานะ</div>
-                    <div class="chipRow">
-                        <button class="smallBtn" type="button" id="pickDone">เลือก: เสร็จแล้ว</button>
-                        <button class="smallBtn" type="button" id="pickNotDone">เลือก: ยังไม่เสร็จ</button>
-                        <button class="smallBtn" type="button" id="clearStatus">ล้างสถานะ</button>
-                    </div>
-
-                    <div class="checkGrid">
-                        <label class="checkItem"><input type="checkbox" class="statusCheck" value="รอดำเนินการ">
-                            รอดำเนินการ</label>
-                        <label class="checkItem"><input type="checkbox" class="statusCheck" value="กำลังดำเนินการ">
-                            กำลังดำเนินการ</label>
-                        <label class="checkItem"><input type="checkbox" class="statusCheck" value="เสร็จสิ้น">
-                            เสร็จสิ้น</label>
-                        <label class="checkItem"><input type="checkbox" class="statusCheck" value="ยกเลิก">
-                            ยกเลิก</label>
-                    </div>
-                </div>
-
-                <!-- BUILDING -->
-                <div class="detailBox" style="margin-top:12px;">
-                    <div class="label">อาคาร</div>
-                    <div class="chipRow">
-                        <button class="smallBtn" type="button" id="clearBuilding">ล้างอาคาร</button>
-                    </div>
-
-                    <div class="checkGrid">
-                        <label class="checkItem"><input type="checkbox" class="buildingCheck"
-                                value="อาคารปฏิบัติการวิศวกรรม"> อาคารปฏิบัติการวิศวกรรม</label>
-                        <label class="checkItem"><input type="checkbox" class="buildingCheck"
-                                value="อาคารเรียนราชวิทย์"> อาคารเรียนราชวิทย์</label>
-                        <label class="checkItem"><input type="checkbox" class="buildingCheck" value="อาคารอำนวยการ">
-                            อาคารอำนวยการ</label>
-                        <label class="checkItem"><input type="checkbox" class="buildingCheck"
-                                value="อาคารปฏิบัติการทางวิทยาศาสตร์"> อาคารปฏิบัติการทางวิทยาศาสตร์</label>
-                        <label class="checkItem"><input type="checkbox" class="buildingCheck" value="โรงอาหาร">
-                            โรงอาหาร</label>
-                        <label class="checkItem"><input type="checkbox" class="buildingCheck" value="อาคารศูนย์กีฬา">
-                            อาคารศูนย์กีฬา</label>
-                    </div>
-                </div>
-
-                <!-- ITEM TYPE -->
-                <div class="detailBox" style="margin-top:12px;">
-                    <div class="label">ประเภทสิ่งของ</div>
-                    <div class="chipRow">
-                        <button class="smallBtn" type="button" id="clearItemType">ล้างประเภทสิ่งของ</button>
-                    </div>
-
-                    <div class="checkGrid">
-                        <label class="checkItem"><input type="checkbox" class="itemTypeCheck" value="ไฟฟ้า/ไฟสว่าง">
-                            ไฟฟ้า/ไฟสว่าง</label>
-                        <label class="checkItem"><input type="checkbox" class="itemTypeCheck" value="น้ำ/ห้องน้ำ">
-                            น้ำ/ห้องน้ำ</label>
-                        <label class="checkItem"><input type="checkbox" class="itemTypeCheck" value="ห้องเรียน/อาคาร">
-                            ห้องเรียน/อาคาร</label>
-                        <label class="checkItem"><input type="checkbox" class="itemTypeCheck" value="ประตู/หน้าต่าง">
-                            ประตู/หน้าต่าง</label>
-                        <label class="checkItem"><input type="checkbox" class="itemTypeCheck"
-                                value="โต๊ะ/เก้าอี้/เฟอร์นิเจอร์"> โต๊ะ/เก้าอี้/เฟอร์นิเจอร์</label>
-                        <label class="checkItem"><input type="checkbox" class="itemTypeCheck"
-                                value="คอมพิวเตอร์/โปรเจคเตอร์/อินเทอร์เน็ต">
-                            คอมพิวเตอร์/โปรเจคเตอร์/อินเทอร์เน็ต</label>
-                        <label class="checkItem"><input type="checkbox" class="itemTypeCheck"
-                                value="อุปกรณ์กีฬา/เครื่องออกกำลังกาย"> อุปกรณ์กีฬา/เครื่องออกกำลังกาย</label>
-                    </div>
-                </div>
-            </div>
-
-            <div class="filterActions">
-                <button class="btn outline" type="button" id="resetAll">รีเซ็ตทั้งหมด</button>
-                <button class="btn primary" type="button" id="applyFilter">ใช้ตัวกรอง</button>
-            </div>
+      <div class="filterPanel">
+        <div class="filterTop">
+          <h3>ตัวกรองรายการ</h3>
+          <button class="smallBtn" type="button" id="closeFilter">ปิด</button>
         </div>
 
+        <div class="filterBody">
+          <!-- STATUS -->
+          <div class="detailBox" style="margin-top: 0">
+            <div class="label">สถานะ</div>
+            <div class="chipRow">
+              <button class="smallBtn" type="button" id="pickDone">
+                เลือก: เสร็จแล้ว
+              </button>
+              <button class="smallBtn" type="button" id="pickNotDone">
+                เลือก: ยังไม่เสร็จ
+              </button>
+              <button class="smallBtn" type="button" id="clearStatus">
+                ล้างสถานะ
+              </button>
+            </div>
+
+            <div class="checkGrid">
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="statusCheck"
+                  value="รอดำเนินการ"
+                />
+                รอดำเนินการ</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="statusCheck"
+                  value="กำลังดำเนินการ"
+                />
+                กำลังดำเนินการ</label
+              >
+              <label class="checkItem"
+                ><input type="checkbox" class="statusCheck" value="เสร็จสิ้น" />
+                เสร็จสิ้น</label
+              >
+              <label class="checkItem"
+                ><input type="checkbox" class="statusCheck" value="ยกเลิก" />
+                ยกเลิก</label
+              >
+            </div>
+          </div>
+
+          <!-- BUILDING -->
+          <div class="detailBox" style="margin-top: 12px">
+            <div class="label">อาคาร</div>
+            <div class="chipRow">
+              <button class="smallBtn" type="button" id="clearBuilding">
+                ล้างอาคาร
+              </button>
+            </div>
+
+            <div class="checkGrid">
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="buildingCheck"
+                  value="อาคารปฏิบัติการวิศวกรรม"
+                />
+                อาคารปฏิบัติการวิศวกรรม</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="buildingCheck"
+                  value="อาคารเรียนราชวิทย์"
+                />
+                อาคารเรียนราชวิทย์</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="buildingCheck"
+                  value="อาคารอำนวยการ"
+                />
+                อาคารอำนวยการ</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="buildingCheck"
+                  value="อาคารปฏิบัติการทางวิทยาศาสตร์"
+                />
+                อาคารปฏิบัติการทางวิทยาศาสตร์</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="buildingCheck"
+                  value="โรงอาหาร"
+                />
+                โรงอาหาร</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="buildingCheck"
+                  value="อาคารศูนย์กีฬา"
+                />
+                อาคารศูนย์กีฬา</label
+              >
+            </div>
+          </div>
+
+          <!-- ITEM TYPE -->
+          <div class="detailBox" style="margin-top: 12px">
+            <div class="label">ประเภทสิ่งของ</div>
+            <div class="chipRow">
+              <button class="smallBtn" type="button" id="clearItemType">
+                ล้างประเภทสิ่งของ
+              </button>
+            </div>
+
+            <div class="checkGrid">
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="itemTypeCheck"
+                  value="ไฟฟ้า/ไฟสว่าง"
+                />
+                ไฟฟ้า/ไฟสว่าง</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="itemTypeCheck"
+                  value="น้ำ/ห้องน้ำ"
+                />
+                น้ำ/ห้องน้ำ</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="itemTypeCheck"
+                  value="ห้องเรียน/อาคาร"
+                />
+                ห้องเรียน/อาคาร</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="itemTypeCheck"
+                  value="ประตู/หน้าต่าง"
+                />
+                ประตู/หน้าต่าง</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="itemTypeCheck"
+                  value="โต๊ะ/เก้าอี้/เฟอร์นิเจอร์"
+                />
+                โต๊ะ/เก้าอี้/เฟอร์นิเจอร์</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="itemTypeCheck"
+                  value="คอมพิวเตอร์/โปรเจคเตอร์/อินเทอร์เน็ต"
+                />
+                คอมพิวเตอร์/โปรเจคเตอร์/อินเทอร์เน็ต</label
+              >
+              <label class="checkItem"
+                ><input
+                  type="checkbox"
+                  class="itemTypeCheck"
+                  value="อุปกรณ์กีฬา/เครื่องออกกำลังกาย"
+                />
+                อุปกรณ์กีฬา/เครื่องออกกำลังกาย</label
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="filterActions">
+          <button class="btn outline" type="button" id="resetAll">
+            รีเซ็ตทั้งหมด
+          </button>
+          <button class="btn primary" type="button" id="applyFilter">
+            ใช้ตัวกรอง
+          </button>
+        </div>
+      </div>
     </div>
 
     <script>
-        // tabs
-        document.getElementById("tabDash").addEventListener("click", () => window.location.replace("/admin/dashboard"));
-        document.getElementById("tabList").addEventListener("click", () => window.location.replace("/admin/complaints"));
+      // tabs
+      // tabs
+      document
+        .getElementById("tabDash")
+        .addEventListener("click", () =>
+          window.location.replace("/admin/dashboard"),
+        );
+      document
+        .getElementById("tabList")
+        .addEventListener("click", () =>
+          window.location.replace("/admin/complaints"),
+        );
+      document
+        .getElementById("tabUsers")
+        ?.addEventListener("click", () =>
+          window.location.replace("/admin/users"),
+        );
 
-        // ===== Helpers =====
-        function escapeHtml(s) {
-            return (s ?? "").toString()
-                .replaceAll("&", "&amp;")
-                .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;")
-                .replaceAll('"', "&quot;")
-                .replaceAll("'", "&#039;");
+      const CURRENT_ROLE = "{{ role }}";
+
+      // ===== Helpers =====
+      function escapeHtml(s) {
+        return (s ?? "")
+          .toString()
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function statusClass(status) {
+        if (status === "รอดำเนินการ") return "status-wait";
+        if (status === "กำลังดำเนินการ") return "status-progress";
+        if (status === "เสร็จสิ้น") return "status-done";
+        return ""; // ยกเลิก = เดิม
+      }
+
+      function normalizeBuilding(itemEl) {
+        const b = (itemEl.getAttribute("data-building") || "").trim();
+        if (b) return b;
+        const loc = (itemEl.getAttribute("data-location") || "").trim();
+        if (loc.includes(" - ")) return loc.split(" - ")[0].trim();
+        return loc || "-";
+      }
+
+      // apply badge colors
+      document.querySelectorAll(".listItem[data-id]").forEach((item) => {
+        const st = item.getAttribute("data-status") || "";
+        const badge = item.querySelector(".jsStatusBadge");
+        if (badge) {
+          const cls = statusClass(st);
+          if (cls) badge.classList.add(cls);
+        }
+      });
+
+      // ===== Inline Detail (เหมือน v0.3.7) =====
+      const list = document.getElementById("list");
+      let activeId = null;
+      let detailEl = null;
+
+      function clearSelection() {
+        document
+          .querySelectorAll(".listItem.selected")
+          .forEach((el) => el.classList.remove("selected"));
+      }
+      function closeDetail() {
+        activeId = null;
+        clearSelection();
+        if (detailEl) {
+          detailEl.remove();
+          detailEl = null;
+        }
+        if (list) list.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      function renderMediaSlider(
+        paths,
+        sliderKey,
+        title = "ไฟล์แนบ",
+        emptyText = "ไม่มีไฟล์แนบ",
+      ) {
+        if (!paths || paths.length === 0) {
+          return `<div class="value">${escapeHtml(emptyText)}</div>`;
         }
 
-        function statusClass(status) {
-            if (status === "รอดำเนินการ") return "status-wait";
-            if (status === "กำลังดำเนินการ") return "status-progress";
-            if (status === "เสร็จสิ้น") return "status-done";
-            return ""; // ยกเลิก = เดิม
+        const sid = `s_${sliderKey}_${Math.random().toString(16).slice(2)}`;
+
+        let slides = "";
+        for (let i = 0; i < paths.length; i++) {
+          const p = paths[i];
+          const lower = (p || "").toLowerCase();
+          if (lower.endsWith(".mp4")) {
+            slides += `
+<div class="mediaSlide" data-idx="${i}">
+  <video class="media" controls src="${escapeHtml(p)}"></video>
+</div>`;
+          } else {
+            slides += `
+<div class="mediaSlide" data-idx="${i}">
+  <img class="media" src="${escapeHtml(p)}" alt="attachment"/>
+</div>`;
+          }
         }
 
-        function normalizeBuilding(itemEl) {
-            const b = (itemEl.getAttribute("data-building") || "").trim();
-            if (b) return b;
-            const loc = (itemEl.getAttribute("data-location") || "").trim();
-            if (loc.includes(" - ")) return loc.split(" - ")[0].trim();
-            return loc || "-";
-        }
+        const showNav = paths.length > 1;
 
-        // apply badge colors
-        document.querySelectorAll(".listItem[data-id]").forEach(item => {
-            const st = item.getAttribute("data-status") || "";
-            const badge = item.querySelector(".jsStatusBadge");
-            if (badge) {
-                const cls = statusClass(st);
-                if (cls) badge.classList.add(cls);
+        return `
+<div class="mediaSlider" data-slider="${sid}">
+  <div class="mediaSliderTop">
+    <div style="font-weight:900;">${escapeHtml(title)}</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div class="mediaSliderCounter"><span class="jsCur">1</span>/<span class="jsTot">${paths.length}</span></div>
+      ${
+        showNav
+          ? `
+        <button class="sliderNavBtn" type="button" data-dir="-1">‹</button>
+        <button class="sliderNavBtn" type="button" data-dir="1">›</button>
+      `
+          : ``
+      }
+    </div>
+  </div>
+  <div class="mediaSliderViewport">
+    ${slides}
+  </div>
+</div>`;
+      }
+
+      function initSliders(scopeEl) {
+        (scopeEl || document)
+          .querySelectorAll(".mediaSlider[data-slider]")
+          .forEach((sl) => {
+            const slides = Array.from(sl.querySelectorAll(".mediaSlide"));
+            if (!slides.length) return;
+
+            let idx = 0;
+            const curEl = sl.querySelector(".jsCur");
+            const totEl = sl.querySelector(".jsTot");
+
+            function show(i) {
+              idx = (i + slides.length) % slides.length;
+              slides.forEach((s) => s.classList.remove("active"));
+              slides[idx].classList.add("active");
+              if (curEl) curEl.textContent = String(idx + 1);
+              if (totEl) totEl.textContent = String(slides.length);
             }
-        });
 
-        // ===== Inline Detail (เหมือน v0.3.7) =====
-        const list = document.getElementById("list");
-        let activeId = null;
-        let detailEl = null;
+            sl.querySelectorAll(".sliderNavBtn").forEach((btn) => {
+              btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const dir = parseInt(btn.getAttribute("data-dir") || "0", 10);
+                show(idx + dir);
+              });
+            });
 
-        function clearSelection() {
-            document.querySelectorAll(".listItem.selected").forEach(el => el.classList.remove("selected"));
-        }
-        function closeDetail() {
-            activeId = null;
-            clearSelection();
-            if (detailEl) {
-                detailEl.remove();
-                detailEl = null;
-            }
-            if (list) list.scrollIntoView({behavior: "smooth", block: "start"});
-        }
+            show(0);
+          });
+      }
 
-        function renderAttachments(paths) {
-            if (!paths || paths.length === 0) {
-                return `<div class="value">ไม่มีไฟล์แนบ</div>`;
-            }
-            let html = `<div class="previewGrid">`;
-            for (const p of paths) {
-                const lower = (p || "").toLowerCase();
-                if (lower.endsWith(".mp4")) {
-                    html += `
-            <div class="previewCard">
-              <div class="previewMedia">
-                <video class="media" controls src="${escapeHtml(p)}"></video>
-              </div>
-            </div>
-          `;
-                } else {
-                    html += `
-            <div class="previewCard">
-              <div class="previewMedia">
-                <img class="media" src="${escapeHtml(p)}" alt="attachment"/>
-              </div>
-            </div>
-          `;
-                }
-            }
-            html += `</div>`;
-            return html;
+      function statusOptions(current) {
+        const opts = ["รอดำเนินการ", "กำลังดำเนินการ", "เสร็จสิ้น", "ยกเลิก"];
+        return opts
+          .map(
+            (s) =>
+              `<option value="${s}" ${current === s ? "selected" : ""}>${s}</option>`,
+          )
+          .join("");
+      }
+
+      function applySelectColor(selectEl) {
+        selectEl.classList.remove(
+          "status-wait",
+          "status-progress",
+          "status-done",
+        );
+        const cls = statusClass(selectEl.value);
+        if (cls) selectEl.classList.add(cls);
+      }
+
+      async function openDetailUnder(itemEl, id) {
+        clearSelection();
+        itemEl.classList.add("selected");
+
+        if (detailEl) {
+          detailEl.remove();
+          detailEl = null;
         }
 
-        function statusOptions(current) {
-            const opts = ["รอดำเนินการ", "กำลังดำเนินการ", "เสร็จสิ้น", "ยกเลิก"];
-            return opts.map(s => `<option value="${s}" ${current === s ? "selected" : ""}>${s}</option>`).join("");
-        }
-
-        function applySelectColor(selectEl) {
-            selectEl.classList.remove("status-wait", "status-progress", "status-done");
-            const cls = statusClass(selectEl.value);
-            if (cls) selectEl.classList.add(cls);
-        }
-
-        async function openDetailUnder(itemEl, id) {
-            clearSelection();
-            itemEl.classList.add("selected");
-
-            if (detailEl) {
-                detailEl.remove();
-                detailEl = null;
-            }
-
-            detailEl = document.createElement("div");
-            detailEl.className = "inlineDetail";
-            detailEl.innerHTML = `
+        detailEl = document.createElement("div");
+        detailEl.className = "inlineDetail";
+        detailEl.innerHTML = `
         <div class="inlineDetailHeader">
           <div style="font-weight:900;">รายละเอียดเรื่องร้องเรียน</div>
           <button class="smallBtn" type="button" id="inlineCloseBtn">ปิด</button>
         </div>
         <div class="empty">กำลังโหลดรายละเอียด...</div>
       `;
-            itemEl.insertAdjacentElement("afterend", detailEl);
-            detailEl.scrollIntoView({behavior: "smooth", block: "start"});
+        itemEl.insertAdjacentElement("afterend", detailEl);
+        detailEl.scrollIntoView({ behavior: "smooth", block: "start" });
 
-            detailEl.querySelector("#inlineCloseBtn").addEventListener("click", (e) => {
-                e.stopPropagation();
-                closeDetail();
-            });
+        detailEl
+          .querySelector("#inlineCloseBtn")
+          .addEventListener("click", (e) => {
+            e.stopPropagation();
+            closeDetail();
+          });
 
-            const res = await fetch(`/admin/complaint/${id}/detail`, {method: "GET"});
-            if (!res.ok) {
-                detailEl.querySelector(".empty").textContent = "ไม่พบรายละเอียด";
-                return;
+        const res = await fetch(`/admin/complaint/${id}/detail`, {
+          method: "GET",
+        });
+        if (!res.ok) {
+          detailEl.querySelector(".empty").textContent = "ไม่พบรายละเอียด";
+          return;
+        }
+        const d = await res.json();
+
+        const attHtml = renderMediaSlider(
+          d.attachments || [],
+          `att_${d.id}`,
+          "ไฟล์แนบ",
+          "ไม่มีไฟล์แนบ",
+        );
+        const workHtml = renderMediaSlider(
+          d.work_attachments || [],
+          `work_${d.id}`,
+          "ไฟล์หน้างาน (หลักฐานการดำเนินงาน)",
+          "ยังไม่มีไฟล์หน้างาน",
+        );
+
+        const showDelete = CURRENT_ROLE === "root";
+        const deleteHtml = showDelete
+          ? `
+<form method="post" action="/admin/delete-complaint" style="display:inline-flex;">
+  <input type="hidden" name="complaint_id" value="${escapeHtml(d.id)}">
+  <button class="btn danger" type="submit" onclick="return confirm('ยืนยันลบคำร้องนี้?');">ลบคำร้อง</button>
+</form>
+`
+          : ``;
+
+        detailEl.innerHTML = `
+<div class="inlineDetailHeader">
+  <div style="font-weight:900;">รายละเอียดเรื่องร้องเรียน</div>
+  <button class="smallBtn" type="button" id="inlineCloseBtn">ปิด</button>
+</div>
+
+<div class="detailSplit">
+  <div>
+    <div class="detailBox" style="margin-top:0;">
+      <div class="label">ประเภทสิ่งของ</div>
+      <div class="value">${escapeHtml(d.item_type || "-")}</div>
+    </div>
+
+    <div class="detailBox" style="margin-top:12px;">
+      <div class="label">รายละเอียด</div>
+      <div class="value" style="white-space:pre-wrap;">${escapeHtml(d.description || "-")}</div>
+    </div>
+  </div>
+
+  <div>
+    ${attHtml}
+  </div>
+</div>
+
+<div class="detailBox" style="margin-top:12px;">
+  ${workHtml}
+  <div class="proofHint">* ไฟล์หน้างานจะแสดงให้ผู้ร้องเรียน (Student) เห็นด้วย</div>
+</div>
+
+<div class="adminUpdateRow">
+  <form method="post" action="/admin/update-status" id="statusForm" enctype="multipart/form-data"
+        style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <input type="hidden" name="complaint_id" value="${escapeHtml(d.id)}">
+
+    <label class="proofUpload" id="proofUploadBtn">
+      <input type="file" name="work_files" id="workFiles" accept=".jpg,.jpeg,.png,.mp4" multiple required>
+      อัปโหลดหน้างาน
+    </label>
+
+    <select name="status" id="statusSelect" class="statusSelect" required>
+      ${statusOptions(d.status)}
+    </select>
+
+    <button class="btn primary" id="updateBtn" type="submit" disabled>อัปเดตสถานะ</button>
+  </form>
+
+  ${deleteHtml}
+</div>
+`;
+
+        detailEl
+          .querySelector("#inlineCloseBtn")
+          .addEventListener("click", (e) => {
+            e.stopPropagation();
+            closeDetail();
+          });
+
+        detailEl
+          .querySelector("#statusForm")
+          .addEventListener("click", (e) => e.stopPropagation());
+
+        const sel = detailEl.querySelector("#statusSelect");
+        if (sel) {
+          applySelectColor(sel);
+          sel.addEventListener("change", () => applySelectColor(sel));
+          // init sliders
+          initSliders(detailEl);
+
+          // Require proof upload before update
+          const workFilesInput = detailEl.querySelector("#workFiles");
+          const updateBtn = detailEl.querySelector("#updateBtn");
+          const proofBtn = detailEl.querySelector("#proofUploadBtn");
+
+          function refreshUpdateEnable() {
+            const hasFiles =
+              workFilesInput &&
+              workFilesInput.files &&
+              workFilesInput.files.length > 0;
+            if (updateBtn) updateBtn.disabled = !hasFiles;
+            if (proofBtn) {
+              proofBtn.style.borderStyle = hasFiles ? "solid" : "dashed";
+              proofBtn.childNodes[proofBtn.childNodes.length - 1].textContent =
+                hasFiles
+                  ? `อัปโหลดหน้างาน (${workFilesInput.files.length} ไฟล์)`
+                  : `อัปโหลดหน้างาน`;
             }
-            const d = await res.json();
-
-            detailEl.innerHTML = `
-        <div class="inlineDetailHeader">
-          <div style="font-weight:900;">รายละเอียดเรื่องร้องเรียน</div>
-          <button class="smallBtn" type="button" id="inlineCloseBtn">ปิด</button>
-        </div>
-
-        <div class="detailBox" style="margin-top:0;">
-          <div class="label">ประเภทสิ่งของ</div>
-          <div class="value">${escapeHtml(d.item_type || "-")}</div>
-        </div>
-
-        <div class="detailBox" style="margin-top:12px;">
-          <div class="label">รายละเอียด</div>
-          <div class="value" style="white-space:pre-wrap;">${escapeHtml(d.description || "-")}</div>
-        </div>
-
-        <div class="detailBox" style="margin-top:12px;">
-          <div class="label">ไฟล์แนบ</div>
-          ${renderAttachments(d.attachments || [])}
-        </div>
-
-        <div class="adminUpdateRow">
-          <form method="post" action="/admin/update-status" id="statusForm" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <input type="hidden" name="complaint_id" value="${escapeHtml(d.id)}">
-            <select name="status" id="statusSelect" class="statusSelect" required>
-              ${statusOptions(d.status)}
-            </select>
-            <button class="btn primary" type="submit">อัปเดตสถานะ</button>
-          </form>
-        </div>
-      `;
-
-            detailEl.querySelector("#inlineCloseBtn").addEventListener("click", (e) => {
-                e.stopPropagation();
-                closeDetail();
-            });
-
-            detailEl.querySelector("#statusForm").addEventListener("click", (e) => e.stopPropagation());
-
-            const sel = detailEl.querySelector("#statusSelect");
-            if (sel) {
-                applySelectColor(sel);
-                sel.addEventListener("change", () => applySelectColor(sel));
-            }
+          }
+          workFilesInput?.addEventListener("change", refreshUpdateEnable);
+          refreshUpdateEnable();
         }
+      }
 
-        if (list) {
-            list.addEventListener("click", (e) => {
-                const item = e.target.closest(".listItem[data-id]");
-                if (!item) return;
+      if (list) {
+        list.addEventListener("click", (e) => {
+          const item = e.target.closest(".listItem[data-id]");
+          if (!item) return;
 
-                const id = item.getAttribute("data-id");
-                if (activeId === id) {
-                    closeDetail();
-                    return;
-                }
-                activeId = id;
-                openDetailUnder(item, id);
-            });
-        }
+          const id = item.getAttribute("data-id");
+          if (activeId === id) {
+            closeDetail();
+            return;
+          }
+          activeId = id;
+          openDetailUnder(item, id);
+        });
+      }
 
-        // ===== Filter UI =====
-        const overlay = document.getElementById("filterOverlay");
-        document.getElementById("openFilter")?.addEventListener("click", () => overlay.style.display = "flex");
-        document.getElementById("closeFilter")?.addEventListener("click", () => overlay.style.display = "none");
-        overlay?.addEventListener("click", (e) => {if (e.target === overlay) overlay.style.display = "none";});
+      // ===== Filter UI =====
+      const overlay = document.getElementById("filterOverlay");
+      document
+        .getElementById("openFilter")
+        ?.addEventListener("click", () => (overlay.style.display = "flex"));
+      document
+        .getElementById("closeFilter")
+        ?.addEventListener("click", () => (overlay.style.display = "none"));
+      overlay?.addEventListener("click", (e) => {
+        if (e.target === overlay) overlay.style.display = "none";
+      });
 
-        const statusChecks = () => Array.from(document.querySelectorAll(".statusCheck"));
-        const buildingChecks = () => Array.from(document.querySelectorAll(".buildingCheck"));
-        const itemTypeChecks = () => Array.from(document.querySelectorAll(".itemTypeCheck"));
+      const statusChecks = () =>
+        Array.from(document.querySelectorAll(".statusCheck"));
+      const buildingChecks = () =>
+        Array.from(document.querySelectorAll(".buildingCheck"));
+      const itemTypeChecks = () =>
+        Array.from(document.querySelectorAll(".itemTypeCheck"));
 
-        function setStatusChecked(values) {
-            const set = new Set(values);
-            statusChecks().forEach(ch => ch.checked = set.has(ch.value));
-        }
-        function clearChecks(getter) {getter().forEach(ch => ch.checked = false);}
+      function setStatusChecked(values) {
+        const set = new Set(values);
+        statusChecks().forEach((ch) => (ch.checked = set.has(ch.value)));
+      }
+      function clearChecks(getter) {
+        getter().forEach((ch) => (ch.checked = false));
+      }
 
-        document.getElementById("pickDone")?.addEventListener("click", () => setStatusChecked(["เสร็จสิ้น"]));
-        document.getElementById("pickNotDone")?.addEventListener("click", () => setStatusChecked(["รอดำเนินการ", "กำลังดำเนินการ"]));
-        document.getElementById("clearStatus")?.addEventListener("click", () => clearChecks(statusChecks));
-        document.getElementById("clearBuilding")?.addEventListener("click", () => clearChecks(buildingChecks));
-        document.getElementById("clearItemType")?.addEventListener("click", () => clearChecks(itemTypeChecks));
+      document
+        .getElementById("pickDone")
+        ?.addEventListener("click", () => setStatusChecked(["เสร็จสิ้น"]));
+      document
+        .getElementById("pickNotDone")
+        ?.addEventListener("click", () =>
+          setStatusChecked(["รอดำเนินการ", "กำลังดำเนินการ"]),
+        );
+      document
+        .getElementById("clearStatus")
+        ?.addEventListener("click", () => clearChecks(statusChecks));
+      document
+        .getElementById("clearBuilding")
+        ?.addEventListener("click", () => clearChecks(buildingChecks));
+      document
+        .getElementById("clearItemType")
+        ?.addEventListener("click", () => clearChecks(itemTypeChecks));
 
-        function getSelectedValues(getter) {
-            return getter().filter(ch => ch.checked).map(ch => ch.value);
-        }
+      function getSelectedValues(getter) {
+        return getter()
+          .filter((ch) => ch.checked)
+          .map((ch) => ch.value);
+      }
 
-        function applyFiltersToList() {
-            const selectedStatuses = new Set(getSelectedValues(statusChecks));
-            const selectedBuildings = new Set(getSelectedValues(buildingChecks));
-            const selectedItemTypes = new Set(getSelectedValues(itemTypeChecks));
+      function applyFiltersToList() {
+        const selectedStatuses = new Set(getSelectedValues(statusChecks));
+        const selectedBuildings = new Set(getSelectedValues(buildingChecks));
+        const selectedItemTypes = new Set(getSelectedValues(itemTypeChecks));
 
-            const items = document.querySelectorAll(".listItem[data-id]");
-            let anyShown = false;
+        const items = document.querySelectorAll(".listItem[data-id]");
+        let anyShown = false;
 
-            items.forEach(item => {
-                const st = (item.getAttribute("data-status") || "").trim();
-                const b = normalizeBuilding(item);
-                const it = (item.getAttribute("data-itemtype") || "").trim();
+        items.forEach((item) => {
+          const st = (item.getAttribute("data-status") || "").trim();
+          const b = normalizeBuilding(item);
+          const it = (item.getAttribute("data-itemtype") || "").trim();
 
-                const okStatus = (selectedStatuses.size === 0) || selectedStatuses.has(st);
-                const okBuilding = (selectedBuildings.size === 0) || selectedBuildings.has(b);
-                const okItem = (selectedItemTypes.size === 0) || selectedItemTypes.has(it);
+          const okStatus =
+            selectedStatuses.size === 0 || selectedStatuses.has(st);
+          const okBuilding =
+            selectedBuildings.size === 0 || selectedBuildings.has(b);
+          const okItem =
+            selectedItemTypes.size === 0 || selectedItemTypes.has(it);
 
-                const show = okStatus && okBuilding && okItem;
-                item.style.display = show ? "" : "none";
-                if (show) anyShown = true;
-            });
-
-            if (activeId) {
-                const activeItem = document.querySelector(`.listItem[data-id="${activeId}"]`);
-                if (!activeItem || activeItem.style.display === "none") {
-                    closeDetail();
-                }
-            }
-
-            if (!anyShown && list) {
-                if (!document.getElementById("filterEmpty")) {
-                    const div = document.createElement("div");
-                    div.id = "filterEmpty";
-                    div.className = "empty";
-                    div.textContent = "ไม่พบรายการตามตัวกรอง";
-                    list.insertAdjacentElement("beforebegin", div);
-                }
-            } else {
-                document.getElementById("filterEmpty")?.remove();
-            }
-        }
-
-        document.getElementById("applyFilter")?.addEventListener("click", () => {
-            applyFiltersToList();
-            overlay.style.display = "none";
+          const show = okStatus && okBuilding && okItem;
+          item.style.display = show ? "" : "none";
+          if (show) anyShown = true;
         });
 
-        document.getElementById("resetAll")?.addEventListener("click", () => {
-            clearChecks(statusChecks);
-            clearChecks(buildingChecks);
-            clearChecks(itemTypeChecks);
-            applyFiltersToList();
-            overlay.style.display = "none";
-        });
+        if (activeId) {
+          const activeItem = document.querySelector(
+            `.listItem[data-id="${activeId}"]`,
+          );
+          if (!activeItem || activeItem.style.display === "none") {
+            closeDetail();
+          }
+        }
+
+        if (!anyShown && list) {
+          if (!document.getElementById("filterEmpty")) {
+            const div = document.createElement("div");
+            div.id = "filterEmpty";
+            div.className = "empty";
+            div.textContent = "ไม่พบรายการตามตัวกรอง";
+            list.insertAdjacentElement("beforebegin", div);
+          }
+        } else {
+          document.getElementById("filterEmpty")?.remove();
+        }
+      }
+
+      document.getElementById("applyFilter")?.addEventListener("click", () => {
+        applyFiltersToList();
+        overlay.style.display = "none";
+      });
+
+      document.getElementById("resetAll")?.addEventListener("click", () => {
+        clearChecks(statusChecks);
+        clearChecks(buildingChecks);
+        clearChecks(itemTypeChecks);
+        applyFiltersToList();
+        overlay.style.display = "none";
+      });
     </script>
-</body>
-
+  </body>
 </html>
