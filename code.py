@@ -172,8 +172,7 @@ def seed_user(username: str, password: str, role: str):
         pass
 
 
-seed_user("adminroot", "admin123", "root")
-seed_user("admin", "admin123", "admin")
+seed_user("admin", "admin123", "root")
 seed_user("user", "user123", "user")
 
 

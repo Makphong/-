@@ -6,6 +6,42 @@
     <title>Admin - Complaints</title>
     <link rel="stylesheet" href="/static/css/web.css" />
     <style>
+      /* ===== v0.5.1 One-line Update Row on Desktop ===== */
+      .updateControls {
+        width: 100%;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap; /* mobile ยัง wrap ได้ */
+      }
+
+      .updateForm {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap; /* mobile ยัง wrap ได้ */
+        flex: 1;
+      }
+
+      @media (min-width: 900px) {
+        .updateControls {
+          flex-wrap: nowrap;
+        }
+        .updateForm {
+          flex-wrap: nowrap;
+        }
+        .proofUpload {
+          min-width: 220px;
+        }
+        .statusSelect {
+          flex: 1;
+          min-width: 260px;
+        }
+        #updateBtn {
+          min-width: 160px;
+        }
+      }
+
       /* ===== Complaint Detail Layout (Desktop 2 columns) ===== */
       .detailSplit {
         display: grid;
@@ -894,24 +930,26 @@
 </div>
 
 <div class="adminUpdateRow">
-  <form method="post" action="/admin/update-status" id="statusForm" enctype="multipart/form-data"
-        style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-    <input type="hidden" name="complaint_id" value="${escapeHtml(d.id)}">
+  <div class="updateControls">
+    <form method="post" action="/admin/update-status" id="statusForm" class="updateForm" enctype="multipart/form-data">
+      <input type="hidden" name="complaint_id" value="${escapeHtml(d.id)}">
 
-    <label class="proofUpload" id="proofUploadBtn">
-      <input type="file" name="work_files" id="workFiles" accept=".jpg,.jpeg,.png,.mp4" multiple required>
-      อัปโหลดหน้างาน
-    </label>
+      <label class="proofUpload" id="proofUploadBtn">
+        <input type="file" name="work_files" id="workFiles" accept=".jpg,.jpeg,.png,.mp4" multiple required>
+        อัปโหลดหน้างาน
+      </label>
 
-    <select name="status" id="statusSelect" class="statusSelect" required>
-      ${statusOptions(d.status)}
-    </select>
+      <select name="status" id="statusSelect" class="statusSelect" required>
+        ${statusOptions(d.status)}
+      </select>
 
-    <button class="btn primary" id="updateBtn" type="submit" disabled>อัปเดตสถานะ</button>
-  </form>
+      <button class="btn primary" id="updateBtn" type="submit" disabled>อัปเดตสถานะ</button>
+    </form>
 
-  ${deleteHtml}
+    ${deleteHtml}
+  </div>
 </div>
+
 `;
 
         detailEl
