@@ -380,6 +380,7 @@
         background: #fff;
       }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   </head>
 
   <body>
@@ -822,12 +823,14 @@
 
       function statusOptions(current) {
         const opts = ["รอดำเนินการ", "กำลังดำเนินการ", "เสร็จสิ้น", "ยกเลิก"];
-        return opts
+        const placeholder = `<option value="" ${!current ? "selected" : ""} disabled>เลือกสถานะ</option>`;
+        const items = opts
           .map(
             (s) =>
               `<option value="${s}" ${current === s ? "selected" : ""}>${s}</option>`,
           )
           .join("");
+        return placeholder + items;
       }
 
       function applySelectColor(selectEl) {
@@ -893,10 +896,11 @@
         const showDelete = CURRENT_ROLE === "root";
         const deleteHtml = showDelete
           ? `
-<form method="post" action="/admin/delete-complaint" style="display:inline-flex;">
+<form method="post" action="/admin/delete-complaint" style="display:inline-flex;" data-delete="1">
   <input type="hidden" name="complaint_id" value="${escapeHtml(d.id)}">
-  <button class="btn danger" type="submit" onclick="return confirm('ยืนยันลบคำร้องนี้?');">ลบคำร้อง</button>
+  <button class="btn danger jsDeleteComplaint" type="submit">ลบคำร้อง</button>
 </form>
+
 `
           : ``;
 
@@ -931,19 +935,23 @@
 
 <div class="adminUpdateRow">
   <div class="updateControls">
-    <form method="post" action="/admin/update-status" id="statusForm" class="updateForm" enctype="multipart/form-data">
+    <form method="post" action="/admin/update-status" id="statusForm" class="updateForm" enctype="multipart/form-data" novalidate>
+
       <input type="hidden" name="complaint_id" value="${escapeHtml(d.id)}">
 
       <label class="proofUpload" id="proofUploadBtn">
-        <input type="file" name="work_files" id="workFiles" accept=".jpg,.jpeg,.png,.mp4" multiple required>
+       <input type="file" name="work_files" id="workFiles" accept=".jpg,.jpeg,.png,.mp4" multiple>
+
         อัปโหลดหน้างาน
       </label>
 
-      <select name="status" id="statusSelect" class="statusSelect" required>
+     <select name="status" id="statusSelect" class="statusSelect">
+
         ${statusOptions(d.status)}
       </select>
 
-      <button class="btn primary" id="updateBtn" type="submit" disabled>อัปเดตสถานะ</button>
+      <button class="btn primary" id="updateBtn" type="submit">อัปเดตสถานะ</button>
+
     </form>
 
     ${deleteHtml}
@@ -971,26 +979,107 @@
           initSliders(detailEl);
 
           // Require proof upload before update
+          // Proof upload required ONLY when status is "เสร็จสิ้น"
           const workFilesInput = detailEl.querySelector("#workFiles");
           const updateBtn = detailEl.querySelector("#updateBtn");
           const proofBtn = detailEl.querySelector("#proofUploadBtn");
+          const statusForm = detailEl.querySelector("#statusForm");
+
+          function isDoneStatus(v) {
+            return (v || "").trim() === "เสร็จสิ้น";
+          }
 
           function refreshUpdateEnable() {
+            const statusVal = (sel?.value || "").trim();
+            const statusChosen = statusVal.length > 0;
+
             const hasFiles =
               workFilesInput &&
               workFilesInput.files &&
               workFilesInput.files.length > 0;
-            if (updateBtn) updateBtn.disabled = !hasFiles;
+
+            const needProof = isDoneStatus(statusVal);
+
+            // ห้ามใช้ required กับ input file ที่ซ่อนไว้ (browser จะบล็อก submit)
+            // ใช้ Popup บังคับแทน
+            if (workFilesInput) workFilesInput.required = false;
+
+            if (updateBtn) {
+              // ต้องกดได้เสมอ เพื่อให้ Popup ทำงาน
+              updateBtn.disabled = false;
+            }
+
             if (proofBtn) {
               proofBtn.style.borderStyle = hasFiles ? "solid" : "dashed";
+
+              // ไม่แสดงวงเล็บ/คำอธิบายข้างปุ่ม (ตามที่ต้องการ)
+              const label = hasFiles
+                ? `อัปโหลดหน้างาน (${workFilesInput.files.length} ไฟล์)`
+                : `อัปโหลดหน้างาน`;
+
               proofBtn.childNodes[proofBtn.childNodes.length - 1].textContent =
-                hasFiles
-                  ? `อัปโหลดหน้างาน (${workFilesInput.files.length} ไฟล์)`
-                  : `อัปโหลดหน้างาน`;
+                label;
             }
           }
+
           workFilesInput?.addEventListener("change", refreshUpdateEnable);
+          sel?.addEventListener("change", refreshUpdateEnable);
           refreshUpdateEnable();
+
+          // Sweet popup validation before submit
+          statusForm?.addEventListener("submit", (e) => {
+            const statusVal = (sel?.value || "").trim();
+            const statusChosen = statusVal.length > 0;
+            const hasFiles =
+              workFilesInput &&
+              workFilesInput.files &&
+              workFilesInput.files.length > 0;
+
+            if (!statusChosen) {
+              e.preventDefault();
+              if (window.Swal) {
+                Swal.fire({
+                  icon: "warning",
+                  title: "กรุณาเลือกสถานะ",
+                  text: "โปรดเลือกสถานะก่อนทำการอัปเดต",
+                  confirmButtonText: "ตกลง",
+                });
+              } else {
+                alert("กรุณาเลือกสถานะก่อนทำการอัปเดต");
+              }
+              return;
+            }
+            if (isDoneStatus(statusVal) && !hasFiles) {
+              e.preventDefault();
+              if (window.Swal) {
+                Swal.fire({
+                  icon: "warning",
+                  title: "กรุณาอัปโหลดรูป/วิดีโอหน้างาน",
+                  text: "ก่อนอัปเดตเป็นสถานะเสร็จสิ้น ต้องแนบไฟล์หน้างาน",
+                  confirmButtonText: "ตกลง",
+                });
+              } else {
+                alert("ก่อนอัปเดตเป็นสถานะเสร็จสิ้น ต้องแนบไฟล์หน้างาน");
+              }
+              return;
+            }
+          });
+
+          // Root: confirm delete complaint
+          const delForm = detailEl.querySelector('form[data-delete="1"]');
+          delForm?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const r = await Swal.fire({
+              icon: "warning",
+              title: "ยืนยันการลบคำร้อง?",
+              text: "เมื่อลบแล้วจะไม่สามารถกู้คืนได้",
+              showCancelButton: true,
+              confirmButtonText: "ยืนยันลบ",
+              cancelButtonText: "ยกเลิก",
+              confirmButtonColor: "#ef4444",
+            });
+            if (r.isConfirmed) delForm.submit();
+          });
         }
       }
 

@@ -810,35 +810,47 @@ async def admin_update_status(
         return _redirect("/user/send")
 
     valid_files = [f for f in (work_files or []) if getattr(f, "filename", "")]
-    if not valid_files:
-        raise HTTPException(400, "ต้องแนบไฟล์หน้างานก่อนอัปเดตสถานะ")
+    status_clean = (status or "").strip()
 
     if len(valid_files) > MAX_FILES:
         raise HTTPException(400, "แนบไฟล์ได้สูงสุด 3 ไฟล์")
 
-    # เซฟไฟล์หน้างานไว้ใน /static/uploads/work/<complaint_id>/
-    saved_paths = []
-    for f in valid_files:
-        saved_paths.append(await save_upload_file_to(f"work/{complaint_id}", f))
-
     conn = db()
-    row = conn.execute(
-        "SELECT work_attachments FROM complaints WHERE id = ?", (complaint_id,)
-    ).fetchone()
 
-    old_list = []
-    if row:
-        try:
-            old_list = json.loads((row["work_attachments"] or "[]"))
-        except Exception:
-            old_list = []
+    # บังคับแนบไฟล์หน้างานเฉพาะตอนอัปเดตเป็น "เสร็จสิ้น"
+    if status_clean == "เสร็จสิ้น" and not valid_files:
+        raise HTTPException(400, "ต้องแนบไฟล์หน้างานก่อนอัปเดตเป็นสถานะเสร็จสิ้น")
 
-    merged = (old_list or []) + saved_paths
+    if valid_files:
+        # เซฟไฟล์หน้างานไว้ใน /static/uploads/work/<complaint_id>/
+        saved_paths: list[str] = []
+        for f in valid_files:
+            saved_paths.append(await save_upload_file_to(f"work/{complaint_id}", f))
 
-    conn.execute(
-        "UPDATE complaints SET status = ?, work_attachments = ? WHERE id = ?",
-        (status, json.dumps(merged, ensure_ascii=False), complaint_id),
-    )
+        row = conn.execute(
+            "SELECT work_attachments FROM complaints WHERE id = ?", (complaint_id,)
+        ).fetchone()
+
+        old_list: list[str] = []
+        if row:
+            try:
+                old_list = json.loads((row["work_attachments"] or "[]"))
+            except Exception:
+                old_list = []
+
+        merged = (old_list or []) + saved_paths
+
+        conn.execute(
+            "UPDATE complaints SET status = ?, work_attachments = ? WHERE id = ?",
+            (status_clean, json.dumps(merged, ensure_ascii=False), complaint_id),
+        )
+    else:
+        # ไม่แนบไฟล์: อัปเดตเฉพาะสถานะ
+        conn.execute(
+            "UPDATE complaints SET status = ? WHERE id = ?",
+            (status_clean, complaint_id),
+        )
+
     conn.commit()
 
     return _redirect("/admin/complaints")

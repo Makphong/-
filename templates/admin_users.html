@@ -158,6 +158,7 @@
         }
       }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   </head>
 
   <body>
@@ -243,16 +244,13 @@
                       method="post"
                       action="/admin/users/delete"
                       style="display: inline-flex"
+                      data-delete-user="1"
+                      data-username="{{ u.username }}"
                     >
                       <input type="hidden" name="user_id" value="{{ u.id }}" />
-                      <button
-                        class="btn danger"
-                        type="submit"
-                        onclick="return confirm('ยืนยันลบผู้ใช้นี้?');"
-                      >
-                        ลบผู้ใช้
-                      </button>
+                      <button class="btn danger" type="submit">ลบผู้ใช้</button>
                     </form>
+
                     {% endif %}
                   </td>
                 </tr>
@@ -339,6 +337,30 @@
       overlay.addEventListener("click", (e) => {
         if (e.target === overlay) overlay.style.display = "none";
       });
+
+      // Root: confirm delete user (SweetAlert2)
+      document
+        .querySelectorAll('form[data-delete-user="1"]')
+        .forEach((form) => {
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            const username = form.getAttribute("data-username") || "";
+            const r = await Swal.fire({
+              icon: "warning",
+              title: "ยืนยันการลบผู้ใช้?",
+              text: username
+                ? `ต้องการลบผู้ใช้ "${username}" ใช่หรือไม่ (ลบแล้วกู้คืนไม่ได้)`
+                : "ต้องการลบผู้ใช้นี้ใช่หรือไม่ (ลบแล้วกู้คืนไม่ได้)",
+              showCancelButton: true,
+              confirmButtonText: "ยืนยันลบ",
+              cancelButtonText: "ยกเลิก",
+              confirmButtonColor: "#ef4444",
+            });
+
+            if (r.isConfirmed) form.submit();
+          });
+        });
     </script>
   </body>
 </html>
