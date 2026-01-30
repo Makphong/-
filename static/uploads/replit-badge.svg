@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="120" height="28"
+     viewBox="0 0 120 28">
+
+  <a href="https://replit.com/@username/project"
+     target="_blank"
+     rel="noopener noreferrer">
+
+    <rect x="0" y="0" width="120" height="28" rx="5" fill="#DD1200"/>
+
+    <text x="60" y="18"
+          fill="white"
+          text-anchor="middle"
+          font-family="Verdana, Arial, sans-serif"
+          font-size="14"
+          pointer-events="none">
+      Replit
+    </text>
+
+  </a>
+</svg>
