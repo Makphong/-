@@ -63,9 +63,11 @@ def ensure_schema():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password TEXT,
-            role TEXT
+            role TEXT,
+            created_at REAL
         )
         """)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS complaints (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,6 +79,16 @@ def ensure_schema():
         )
         """)
     conn.commit()
+
+    # ===== USERS schema migration (v1.2.0): add created_at =====
+    user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "created_at" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN created_at REAL")
+        now_ts = time.time()
+        conn.execute(
+            "UPDATE users SET created_at = ? WHERE created_at IS NULL", (now_ts,)
+        )
+        conn.commit()
 
     existing_cols = [
         r["name"] for r in conn.execute("PRAGMA table_info(complaints)").fetchall()
@@ -164,9 +176,10 @@ def seed_user(username: str, password: str, role: str):
     conn = db()
     try:
         conn.execute(
-            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-            (username, hash_password(password), role),
+            "INSERT INTO users (username, password, role, created_at) VALUES (?, ?, ?, ?)",
+            (username, hash_password(password), role, time.time()),
         )
+
         conn.commit()
     except Exception:
         pass
@@ -694,11 +707,72 @@ def admin_users_page(request: Request, authorization: str | None = Header(None))
     if user.get("role") != "root":
         return _redirect("/admin/dashboard")
 
+    # ===== Filters (v1.2.0) =====
+    q = (request.query_params.get("q") or "").strip()
+    role_filter = (request.query_params.get("role") or "all").strip().lower()
+    sort = (request.query_params.get("sort") or "created_desc").strip().lower()
+    from_date = (request.query_params.get("from") or "").strip()
+    to_date = (request.query_params.get("to") or "").strip()
+
+    where = []
+    params: list = []
+
+    if q:
+        where.append("username LIKE ?")
+        params.append(f"%{q}%")
+
+    if role_filter in ("student", "admin"):
+        where.append("role = ?")
+        params.append(role_filter)
+    else:
+        role_filter = "all"
+
+    def _parse_date_ymd(s: str, end_of_day: bool) -> float | None:
+        if not s:
+            return None
+        try:
+            dt = datetime.strptime(s, "%Y-%m-%d")
+            if end_of_day:
+                dt = dt.replace(hour=23, minute=59, second=59)
+            return dt.timestamp()
+        except Exception:
+            return None
+
+    ts_from = _parse_date_ymd(from_date, end_of_day=False)
+    ts_to = _parse_date_ymd(to_date, end_of_day=True)
+
+    if ts_from is not None:
+        where.append("created_at >= ?")
+        params.append(ts_from)
+    if ts_to is not None:
+        where.append("created_at <= ?")
+        params.append(ts_to)
+
+    order_map = {
+        "created_desc": "created_at DESC, id DESC",
+        "created_asc": "created_at ASC, id ASC",
+        "username_asc": "username ASC",
+        "username_desc": "username DESC",
+        "id_asc": "id ASC",
+        "id_desc": "id DESC",
+    }
+    order_by = order_map.get(sort, order_map["created_desc"])
+    if sort not in order_map:
+        sort = "created_desc"
+
+    sql = "SELECT id, username, role, created_at FROM users"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY " + order_by
+
     conn = db()
-    rows = conn.execute(
-        "SELECT id, username, role FROM users ORDER BY id ASC"
-    ).fetchall()
-    users = [dict(r) for r in rows]
+    rows = conn.execute(sql, params).fetchall()
+
+    users = []
+    for r in rows:
+        d = dict(r)
+        d["created_at_fmt"] = fmt_th_date(d.get("created_at"))
+        users.append(d)
 
     resp = templates.TemplateResponse(
         "admin_users.html",
@@ -707,6 +781,11 @@ def admin_users_page(request: Request, authorization: str | None = Header(None))
             "username": user["sub"],
             "role": user.get("role"),
             "users": users,
+            "q": q,
+            "role_filter": role_filter,
+            "sort": sort,
+            "from_date": from_date,
+            "to_date": to_date,
             "error": request.query_params.get("error"),
             "success": request.query_params.get("success"),
         },
@@ -743,8 +822,8 @@ def admin_users_create(
     conn = db()
     try:
         conn.execute(
-            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-            (username, hash_password(password), user_type),
+            "INSERT INTO users (username, password, role, created_at) VALUES (?, ?, ?, ?)",
+            (username, hash_password(password), user_type, time.time()),
         )
         conn.commit()
     except Exception:
