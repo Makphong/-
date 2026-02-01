@@ -34,6 +34,110 @@
         flex-wrap: wrap;
         margin: 10px 0;
       }
+
+      .userHeaderRow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: nowrap; /* บรรทัดเดียวเสมอ */
+        overflow-x: auto; /* จอเล็กเลื่อนเอา */
+        -webkit-overflow-scrolling: touch;
+        margin: 10px 0 8px 0;
+      }
+      .userTitle {
+        margin: 0;
+        white-space: nowrap;
+        flex: 0 0 auto;
+      }
+      .userHeaderActions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        flex: 0 0 auto;
+      }
+
+      .searchRow {
+        margin: 8px 0 12px 0;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .searchInput {
+        flex: 1 1 260px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 10px 12px;
+        font-weight: 900;
+        outline: none;
+        background: #fff;
+      }
+
+      /* popup แบบเดียวกับหน้าเรื่องร้องเรียน (แต่ไม่มีเงา) */
+      .filterBtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #fff;
+        cursor: pointer;
+      }
+      .filterOverlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.38);
+        display: none;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 16px 12px;
+        z-index: 9999;
+        overflow: auto;
+      }
+      .filterPanel {
+        width: 560px;
+        max-width: 94vw;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: none; /* ตามที่สั่ง: ไม่เอาเงา */
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .filterTop {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .filterBody {
+        display: block;
+      }
+      .checkGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .checkItem {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 10px 12px;
+        background: #fff;
+        font-weight: 900;
+      }
+      .noteBelow {
+        margin: 6px 0 10px 0;
+      }
+
       .danger {
         background: rgba(239, 68, 68, 0.12);
         color: #b91c1c;
@@ -42,7 +146,7 @@
       .danger:hover {
         background: rgba(239, 68, 68, 0.18);
       }
-z
+      z
       /* ===== Real Table + Responsive ===== */
       .userTableWrap {
         border: 1px solid var(--border);
@@ -180,48 +284,54 @@ z
         </div>
 
         <div class="content">
-          <h2 class="title" style="margin: 10px 0">
-            จัดการผู้ใช้ (Root เท่านั้น)
-          </h2>
+          <div class="userHeaderRow">
+            <h2 class="title userTitle">จัดการผู้ใช้</h2>
 
-          {% if error %}
-          <div
-            class="empty"
-            style="
-              border: 1px solid rgba(239, 68, 68, 0.35);
-              background: rgba(239, 68, 68, 0.08);
-              color: #b91c1c;
-            "
-          >
-            {{ error }}
-          </div>
-          {% endif %} {% if success %}
-          <div
-            class="empty"
-            style="
-              border: 1px solid rgba(34, 197, 94, 0.35);
-              background: rgba(34, 197, 94, 0.08);
-              color: #166534;
-            "
-          >
-            {{ success }}
-          </div>
-          {% endif %}
+            <div class="userHeaderActions">
+              <button class="btn primary" type="button" id="openCreate">
+                สร้างผู้ใช้
+              </button>
 
-          <div class="toolbar">
-            <div class="note">
-              Root สามารถสร้าง Student/Admin และลบผู้ใช้ (ยกเว้น Root)
+              <button
+                class="btn filterBtn"
+                type="button"
+                id="openUserFilter"
+                aria-label="filter"
+                title="ตัวกรอง"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M3 5h18l-7 8v5l-4 2v-7L3 5z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
             </div>
-            <button class="btn primary" type="button" id="openCreate">
-              สร้างผู้ใช้
-            </button>
+          </div>
+
+          <!-- Search (v1.3.1) -->
+          <div class="searchRow">
+            <input
+              class="searchInput"
+              id="userSearch"
+              type="text"
+              placeholder="ค้นหาผู้ใช้..."
+              autocomplete="off"
+            />
+            <button class="btn" type="button" id="clearUserSearch">ล้าง</button>
+          </div>
+
+          <div class="note noteBelow">
+            
           </div>
 
           <div class="userTableWrap">
             <table class="userTable">
               <thead>
                 <tr>
-                  <th style="width: 90px">#</th>
+                  <th style="width: 90px">ลำดับ</th>
                   <th>Username</th>
                   <th style="width: 140px">Role</th>
                   <th style="width: 220px">การทำงาน</th>
@@ -309,6 +419,40 @@ z
         </form>
       </div>
     </div>
+    <!-- User Filter Overlay (v1.3.1) -->
+    <div class="filterOverlay" id="userFilterOverlay">
+      <div class="filterPanel">
+        <div class="filterTop">
+          <h3>ตัวกรองผู้ใช้</h3>
+          <button class="smallBtn" type="button" id="closeUserFilter">
+            ปิด
+          </button>
+        </div>
+
+        <div class="filterBody">
+          <div class="detailBox" style="margin-top: 0">
+            <div class="label">Role</div>
+
+            <div class="checkGrid">
+              <label class="checkItem">
+                <input type="checkbox" class="roleCheck" value="admin" />
+                Admin user
+              </label>
+              <label class="checkItem">
+                <input type="checkbox" class="roleCheck" value="student" />
+                Student user
+              </label>
+            </div>
+
+            <div class="chipRow" style="margin-top: 10px">
+              <button class="smallBtn" type="button" id="clearRoleFilter">
+                ล้างตัวกรอง
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script>
       document
@@ -361,6 +505,94 @@ z
             if (r.isConfirmed) form.submit();
           });
         });
+
+      // ===== User Filter + Search (v1.3.1) =====
+      const userFilterOverlay = document.getElementById("userFilterOverlay");
+      const openUserFilter = document.getElementById("openUserFilter");
+      const closeUserFilter = document.getElementById("closeUserFilter");
+      const roleChecks = Array.from(document.querySelectorAll(".roleCheck"));
+
+      const userSearch = document.getElementById("userSearch");
+      const clearUserSearch = document.getElementById("clearUserSearch");
+
+      let userSearchTerm = "";
+
+      function getSelectedRoles() {
+        return roleChecks.filter((c) => c.checked).map((c) => c.value);
+      }
+
+      function applyUserFilterAndSearch() {
+        const selected = new Set(getSelectedRoles());
+        const rows = document.querySelectorAll(".userTable tbody tr");
+
+        let anyShown = false;
+        rows.forEach((row) => {
+          const role = (
+            row.querySelector('td[data-label="Role"]')?.textContent || ""
+          )
+            .trim()
+            .toLowerCase();
+
+          // filter role (ถ้าไม่เลือกอะไร = แสดงทั้งหมด รวม root)
+          const okRole = selected.size === 0 || selected.has(role);
+
+          // search จาก text ทั้งแถว
+          const text = (row.textContent || "").toLowerCase();
+          const okSearch = !userSearchTerm || text.includes(userSearchTerm);
+
+          const show = okRole && okSearch;
+          row.style.display = show ? "" : "none";
+          if (show) anyShown = true;
+        });
+
+        const existing = document.getElementById("userEmpty");
+        const tableWrap = document.querySelector(".userTableWrap");
+        if (!anyShown && tableWrap) {
+          if (!existing) {
+            const div = document.createElement("div");
+            div.id = "userEmpty";
+            div.className = "empty";
+            div.textContent = "ไม่พบผู้ใช้ตามเงื่อนไข";
+            tableWrap.insertAdjacentElement("beforebegin", div);
+          }
+        } else {
+          existing?.remove();
+        }
+      }
+
+      openUserFilter?.addEventListener("click", () => {
+        if (userFilterOverlay) userFilterOverlay.style.display = "flex";
+      });
+      closeUserFilter?.addEventListener("click", () => {
+        if (userFilterOverlay) userFilterOverlay.style.display = "none";
+      });
+      userFilterOverlay?.addEventListener("click", (e) => {
+        if (e.target === userFilterOverlay)
+          userFilterOverlay.style.display = "none";
+      });
+
+      roleChecks.forEach((c) =>
+        c.addEventListener("change", applyUserFilterAndSearch),
+      );
+      document
+        .getElementById("clearRoleFilter")
+        ?.addEventListener("click", () => {
+          roleChecks.forEach((c) => (c.checked = false));
+          applyUserFilterAndSearch();
+        });
+
+      userSearch?.addEventListener("input", () => {
+        userSearchTerm = (userSearch.value || "").trim().toLowerCase();
+        applyUserFilterAndSearch();
+      });
+      clearUserSearch?.addEventListener("click", () => {
+        if (userSearch) userSearch.value = "";
+        userSearchTerm = "";
+        applyUserFilterAndSearch();
+      });
+
+      // initial
+      applyUserFilterAndSearch();
     </script>
   </body>
 </html>

@@ -322,6 +322,26 @@
         margin-bottom: 10px;
       }
 
+      .searchRow {
+        margin: 10px 0 14px 0;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .searchInput {
+        flex: 1 1 260px;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 10px 12px;
+        font-weight: 900;
+        outline: none;
+        background: #fff;
+      }
+      .searchInput:focus {
+        border-color: rgba(30, 115, 216, 0.35);
+      }
+
       .filterBtn {
         width: 42px;
         height: 42px;
@@ -359,7 +379,8 @@
         background: #fff;
         border: 1px solid var(--border);
         border-radius: 18px;
-        box-shadow: var(--shadow);
+        box-shadow: none;
+
         padding: 14px;
 
         /* เปลี่ยนให้เป็น layout แบบ column แล้วให้ body เป็นตัว scroll */
@@ -489,7 +510,22 @@
             </button>
           </div>
 
+          <!-- Search (v1.3.1) -->
+          <div class="searchRow">
+            <input
+              class="searchInput"
+              id="complaintSearch"
+              type="text"
+              placeholder="ค้นหาในรายการร้องเรียน..."
+              autocomplete="off"
+            />
+            <button class="smallBtn" type="button" id="clearComplaintSearch">
+              ล้าง
+            </button>
+          </div>
+
           {% if complaints|length == 0 %}
+
           <div class="empty">ยังไม่มีรายการร้องเรียน</div>
           {% else %}
           <div id="list" class="list">
@@ -786,6 +822,25 @@
 
       // ===== Inline Detail (เหมือน v0.3.7) =====
       const list = document.getElementById("list");
+
+      // ===== Search (v1.3.1) =====
+      const complaintSearch = document.getElementById("complaintSearch");
+      const clearComplaintSearch = document.getElementById(
+        "clearComplaintSearch",
+      );
+      let searchTerm = "";
+
+      complaintSearch?.addEventListener("input", () => {
+        searchTerm = (complaintSearch.value || "").trim().toLowerCase();
+        applyFiltersToList();
+      });
+
+      clearComplaintSearch?.addEventListener("click", () => {
+        if (complaintSearch) complaintSearch.value = "";
+        searchTerm = "";
+        applyFiltersToList();
+      });
+
       let activeId = null;
       let detailEl = null;
 
@@ -1286,7 +1341,11 @@
           const okItem =
             selectedItemTypes.size === 0 || selectedItemTypes.has(it);
 
-          const show = okStatus && okBuilding && okItem;
+          // Search จากข้อความในการ์ดทั้งหมด (ชัวร์สุด ไม่พึ่ง data-* เพิ่ม)
+          const text = (item.textContent || "").toLowerCase();
+          const okSearch = !searchTerm || text.includes(searchTerm);
+
+          const show = okStatus && okBuilding && okItem && okSearch;
           item.style.display = show ? "" : "none";
           if (show) anyShown = true;
         });
@@ -1305,7 +1364,7 @@
             const div = document.createElement("div");
             div.id = "filterEmpty";
             div.className = "empty";
-            div.textContent = "ไม่พบรายการตามตัวกรอง";
+            div.textContent = "ไม่พบรายการตามเงื่อนไข";
             list.insertAdjacentElement("beforebegin", div);
           }
         } else {
