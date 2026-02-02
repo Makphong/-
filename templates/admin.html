@@ -1157,6 +1157,10 @@
           const proofBtn = detailEl.querySelector("#proofUploadBtn");
           const statusForm = detailEl.querySelector("#statusForm");
 
+          // ✅ มีไฟล์หน้างานเดิมในระบบแล้วไหม (file input จะไม่โชว์ไฟล์เดิม)
+          const hasExistingWork =
+            Array.isArray(d.work_attachments) && d.work_attachments.length > 0;
+
           function isDoneStatus(v) {
             return (v || "").trim() === "เสร็จสิ้น";
           }
@@ -1182,7 +1186,8 @@
             }
 
             if (proofBtn) {
-              proofBtn.style.borderStyle = hasFiles ? "solid" : "dashed";
+              const hasProof = hasFiles || hasExistingWork;
+              proofBtn.style.borderStyle = hasProof ? "solid" : "dashed";
 
               // ไม่แสดงวงเล็บ/คำอธิบายข้างปุ่ม (ตามที่ต้องการ)
               const label = hasFiles
@@ -1221,7 +1226,7 @@
               }
               return;
             }
-            if (isDoneStatus(statusVal) && !hasFiles) {
+            if (isDoneStatus(statusVal) && !hasFiles && !hasExistingWork) {
               e.preventDefault();
               if (window.Swal) {
                 Swal.fire({

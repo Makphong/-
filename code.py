@@ -11,7 +11,8 @@ import time
 import uuid
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
+
 
 # ======================
 # CONFIG
@@ -897,8 +898,23 @@ async def admin_update_status(
     conn = db()
 
     # บังคับแนบไฟล์หน้างานเฉพาะตอนอัปเดตเป็น "เสร็จสิ้น"
+# ✅ ถ้ามีไฟล์หน้างานเดิมอยู่แล้ว ให้ไม่บังคับอัปโหลดใหม่
     if status_clean == "เสร็จสิ้น" and not valid_files:
-        raise HTTPException(400, "ต้องแนบไฟล์หน้างานก่อนอัปเดตเป็นสถานะเสร็จสิ้น")
+        row = conn.execute(
+            "SELECT work_attachments FROM complaints WHERE id = ?",
+            (complaint_id,),
+        ).fetchone()
+
+        existing: list[str] = []
+        if row:
+            try:
+                existing = json.loads((row["work_attachments"] or "[]"))
+            except Exception:
+                existing = []
+
+        if not existing:
+            raise HTTPException(400, "ต้องแนบไฟล์หน้างานก่อนอัปเดตเป็นสถานะเสร็จสิ้น")
+
 
     if valid_files:
         # เซฟไฟล์หน้างานไว้ใน /static/uploads/work/<complaint_id>/
@@ -1049,6 +1065,7 @@ def admin_complaint_detail_json(
 
 
 def _range_to_days(r: str) -> int:
+    """(legacy helper) ยังคงไว้เผื่อหน้าอื่นในอนาคต"""
     r = (r or "week").lower()
     if r == "week":
         return 7
@@ -1061,10 +1078,6 @@ def _range_to_days(r: str) -> int:
     return 7
 
 
-def _start_ts_days(days: int) -> float:
-    return time.time() - (days * 24 * 60 * 60)
-
-
 def _parse_building_from_location(loc: str) -> str:
     if not loc:
         return "-"
@@ -1073,23 +1086,119 @@ def _parse_building_from_location(loc: str) -> str:
     return loc.strip()
 
 
+def _parse_date_ymd(s: str, end_of_day: bool) -> float | None:
+    if not s:
+        return None
+    try:
+        dt = datetime.strptime(s, "%Y-%m-%d")
+        if end_of_day:
+            dt = dt.replace(hour=23, minute=59, second=59)
+        return dt.timestamp()
+    except Exception:
+        return None
+
+
+def _complaints_min_max_ts(conn) -> tuple[float | None, float | None]:
+    row = conn.execute(
+        "SELECT MIN(created_at) AS mn, MAX(created_at) AS mx FROM complaints"
+    ).fetchone()
+    mn = row["mn"] if row else None
+    mx = row["mx"] if row else None
+    return mn, mx
+
+
+def _bucket_start(dt: datetime, granularity: str) -> datetime:
+    g = (granularity or "week").lower()
+
+    if g == "week":
+        # Monday as start of week
+        start = dt - timedelta(days=dt.weekday())
+        return datetime(start.year, start.month, start.day)
+
+    if g == "month":
+        return datetime(dt.year, dt.month, 1)
+
+    if g in ("3month", "three_month", "quarter"):
+        q_month = ((dt.month - 1) // 3) * 3 + 1
+        return datetime(dt.year, q_month, 1)
+
+    if g == "year":
+        return datetime(dt.year, 1, 1)
+
+    # default week
+    start = dt - timedelta(days=dt.weekday())
+    return datetime(start.year, start.month, start.day)
+
+
+def _next_bucket_start(bucket_start: datetime, granularity: str) -> datetime:
+    g = (granularity or "week").lower()
+
+    if g == "week":
+        return bucket_start + timedelta(days=7)
+
+    if g == "month":
+        y, m = bucket_start.year, bucket_start.month
+        if m == 12:
+            return datetime(y + 1, 1, 1)
+        return datetime(y, m + 1, 1)
+
+    if g in ("3month", "three_month", "quarter"):
+        y, m = bucket_start.year, bucket_start.month
+        m2 = m + 3
+        if m2 > 12:
+            return datetime(y + 1, m2 - 12, 1)
+        return datetime(y, m2, 1)
+
+    if g == "year":
+        return datetime(bucket_start.year + 1, 1, 1)
+
+    return bucket_start + timedelta(days=7)
+
+
+def _bucket_label(bucket_start: datetime, granularity: str) -> str:
+    g = (granularity or "week").lower()
+
+    if g == "week":
+        # ISO-like label (year-Wxx), use Monday-start week number (%W)
+        week_no = int(bucket_start.strftime("%W"))
+        return f"{bucket_start.year}-W{week_no:02d}"
+
+    if g == "month":
+        return bucket_start.strftime("%Y-%m")
+
+    if g in ("3month", "three_month", "quarter"):
+        q = ((bucket_start.month - 1) // 3) + 1
+        return f"{bucket_start.year}-Q{q}"
+
+    if g == "year":
+        return str(bucket_start.year)
+
+    week_no = int(bucket_start.strftime("%W"))
+    return f"{bucket_start.year}-W{week_no:02d}"
+
+
 @app.get("/admin/dashboard/summary")
 def admin_dashboard_summary(
-    request: Request, range: str = "week", authorization: str | None = Header(None)
+    request: Request,
+    range: str = "week",
+    start: str | None = None,
+    end: str | None = None,
+    authorization: str | None = Header(None),
 ):
+    """Dashboard Tool #1: Bar (received) + Line (done) by selected granularity."""
     user = get_current_user(request, authorization)
     if user.get("role") not in ("admin", "root"):
         raise HTTPException(403, "Admins only")
 
-    days = _range_to_days(range)
-    start_ts = _start_ts_days(days)
+    gran = (range or "week").lower()
+    if gran not in ("week", "month", "3month", "quarter", "year"):
+        gran = "week"
 
     conn = db()
 
     # today count (นับวันนี้ตั้งแต่ 00:00)
     now = datetime.now()
     today_start = datetime(now.year, now.month, now.day).timestamp()
-
     today_count = conn.execute(
         "SELECT COUNT(*) AS c FROM complaints WHERE created_at >= ?",
         (today_start,),
@@ -1104,81 +1213,189 @@ def admin_dashboard_summary(
         """,
     ).fetchone()["c"]
 
-    # series: counts per day within range
+    # time window (default = ตั้งแต่เริ่มจนถึงล่าสุด)
+    mn_ts, mx_ts = _complaints_min_max_ts(conn)
+    if mn_ts is None or mx_ts is None:
+        return {
+            "range": gran,
+            "today_count": today_count,
+            "unresolved_total": unresolved_total,
+            "buckets": [],
+        }
+
+    ts_from = _parse_date_ymd(start or "", end_of_day=False)
+    ts_to = _parse_date_ymd(end or "", end_of_day=True)
+
+    if ts_from is None:
+        ts_from = float(mn_ts)
+    if ts_to is None:
+        ts_to = float(mx_ts)
+
+    # pull minimal fields and bucket in python (ง่ายและชัดเจนสำหรับ MVP)
     rows = conn.execute(
-        """
-        SELECT strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', 'localtime')) AS d,
-               COUNT(*) AS c
-        FROM complaints
-        WHERE created_at >= ?
-        GROUP BY d
-        ORDER BY d ASC
-        """,
-        (start_ts,),
+        "SELECT created_at, status FROM complaints WHERE created_at >= ? AND created_at <= ?",
+        (ts_from, ts_to),
     ).fetchall()
 
-    series = [{"date": r["d"], "count": r["c"]} for r in rows]
+    # build counts by bucket_start_ts
+    counts_total: dict[float, int] = {}
+    counts_done: dict[float, int] = {}
 
-    # build daily map for locations (for candlestick)
-    loc_rows = conn.execute(
-        """
-        SELECT strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', 'localtime')) AS d,
-               COALESCE(building, '') AS building,
-               COALESCE(location, '') AS location,
-               COUNT(*) AS c
-        FROM complaints
-        WHERE created_at >= ?
-        GROUP BY d, building, location
-        ORDER BY d ASC
-        """,
-        (start_ts,),
-    ).fetchall()
-
-    # collect all dates in range (based on series span; if empty, still return empty)
-    dates = [s["date"] for s in series]
-    date_set = set(dates)
-
-    # build location -> date -> count
-    loc_map = {}
-    for r in loc_rows:
-        b = (r["building"] or "").strip()
-        if not b:
-            b = _parse_building_from_location(r["location"])
-        if not b:
-            b = "-"
-        d = r["d"]
-        if d not in date_set:
-            # ถ้า series ไม่มีวันนั้น (rare) ก็ยังเก็บไว้
-            date_set.add(d)
-        loc_map.setdefault(b, {})
-        loc_map[b][d] = loc_map[b].get(d, 0) + int(r["c"])
-
-    dates_sorted = sorted(list(date_set))
-    if not dates_sorted:
-        dates_sorted = []
-
-    # candlestick data: x=building, y=[open, high, low, close]
-    candles = []
-    for b, day_counts in loc_map.items():
-        counts = [day_counts.get(d, 0) for d in dates_sorted] if dates_sorted else []
-        if not counts:
+    for r in rows:
+        created_at = float(r["created_at"] or 0)
+        if not created_at:
             continue
-        open_v = counts[0]
-        close_v = counts[-1]
-        high_v = max(counts)
-        low_v = min(counts)
-        candles.append({"x": b, "y": [open_v, high_v, low_v, close_v]})
+        dt_local = datetime.fromtimestamp(created_at)
+        b_start = _bucket_start(dt_local, gran)
+        key = b_start.timestamp()
+        counts_total[key] = counts_total.get(key, 0) + 1
+        if (r["status"] or "").strip() == "เสร็จสิ้น":
+            counts_done[key] = counts_done.get(key, 0) + 1
+
+    # fill missing buckets between min/max (within chosen window)
+    start_dt = _bucket_start(datetime.fromtimestamp(ts_from), gran)
+    end_dt = _bucket_start(datetime.fromtimestamp(ts_to), gran)
+
+    buckets = []
+    cursor = start_dt
+    while cursor <= end_dt:
+        next_cursor = _next_bucket_start(cursor, gran)
+        b_start_ts = cursor.timestamp()
+        b_end_ts = (next_cursor - timedelta(seconds=1)).timestamp()
+        label = _bucket_label(cursor, gran)
+        buckets.append(
+            {
+                "label": label,
+                "start": datetime.fromtimestamp(b_start_ts).strftime("%Y-%m-%d"),
+                "end": datetime.fromtimestamp(b_end_ts).strftime("%Y-%m-%d"),
+                "received": int(counts_total.get(b_start_ts, 0)),
+                "done": int(counts_done.get(b_start_ts, 0)),
+            }
+        )
+        cursor = next_cursor
 
     return {
-        "range": range,
+        "range": gran,
         "today_count": today_count,
         "unresolved_total": unresolved_total,
-        "series": series,
-        "candles": candles,
-        "dates": dates_sorted,
+        "buckets": buckets,
     }
 
 
+@app.get("/admin/dashboard/buildings")
+def admin_dashboard_buildings(
+    request: Request,
+    start: str | None = None,
+    end: str | None = None,
+    authorization: str | None = Header(None),
+):
+    """Dashboard Tool #2: totals by building within date range."""
+    user = get_current_user(request, authorization)
+    if user.get("role") not in ("admin", "root"):
+        raise HTTPException(403, "Admins only")
+
+    conn = db()
+    mn_ts, mx_ts = _complaints_min_max_ts(conn)
+    if mn_ts is None or mx_ts is None:
+        return {"items": [], "start": None, "end": None}
+
+    ts_from = _parse_date_ymd(start or "", end_of_day=False)
+    ts_to = _parse_date_ymd(end or "", end_of_day=True)
+    if ts_from is None:
+        ts_from = float(mn_ts)
+    if ts_to is None:
+        ts_to = float(mx_ts)
+
+    # group by building/location then normalize building name
+    rows = conn.execute(
+        """
+        SELECT COALESCE(building,'') AS building,
+               COALESCE(location,'') AS location,
+               COUNT(*) AS c
+        FROM complaints
+        WHERE created_at >= ? AND created_at <= ?
+        GROUP BY building, location
+        """,
+        (ts_from, ts_to),
+    ).fetchall()
+
+    bmap: dict[str, int] = {}
+    for r in rows:
+        b = (r["building"] or "").strip()
+        loc = (r["location"] or "").strip()
+        if not b:
+            b = _parse_building_from_location(loc)
+        if not b:
+            b = "-"
+        bmap[b] = bmap.get(b, 0) + int(r["c"] or 0)
+
+    items = [{"building": k, "count": v} for k, v in bmap.items()]
+    items.sort(key=lambda x: x["count"], reverse=True)
+
+    return {
+        "start": datetime.fromtimestamp(ts_from).strftime("%Y-%m-%d"),
+        "end": datetime.fromtimestamp(ts_to).strftime("%Y-%m-%d"),
+        "items": items,
+    }
+
+
+@app.get("/admin/dashboard/item-types")
+def admin_dashboard_item_types(
+    request: Request,
+    start: str | None = None,
+    end: str | None = None,
+    building: str | None = None,
+    authorization: str | None = Header(None),
+):
+    """Dashboard Tool #3: totals by item_type within date range (+ optional building drilldown)."""
+    user = get_current_user(request, authorization)
+    if user.get("role") not in ("admin", "root"):
+        raise HTTPException(403, "Admins only")
+
+    conn = db()
+    mn_ts, mx_ts = _complaints_min_max_ts(conn)
+    if mn_ts is None or mx_ts is None:
+        return {"items": [], "start": None, "end": None, "building": building}
+
+    ts_from = _parse_date_ymd(start or "", end_of_day=False)
+    ts_to = _parse_date_ymd(end or "", end_of_day=True)
+    if ts_from is None:
+        ts_from = float(mn_ts)
+    if ts_to is None:
+        ts_to = float(mx_ts)
+
+    where = ["created_at >= ?", "created_at <= ?"]
+    params: list = [ts_from, ts_to]
+
+    b = (building or "").strip()
+    if b:
+        where.append(
+            "(COALESCE(building,'') = ? OR (COALESCE(building,'')='' AND COALESCE(location,'') LIKE ?))"
+        )
+        params.append(b)
+        params.append(f"{b}%")
+
+    sql = f"""
+        SELECT COALESCE(item_type, '-') AS item_type,
+               COUNT(*) AS c
+        FROM complaints
+        WHERE {" AND ".join(where)}
+        GROUP BY item_type
+        ORDER BY c DESC
+    """
+
+    rows = conn.execute(sql, params).fetchall()
+    items = [{"item_type": r["item_type"], "count": int(r["c"] or 0)} for r in rows]
+
+    return {
+        "start": datetime.fromtimestamp(ts_from).strftime("%Y-%m-%d"),
+        "end": datetime.fromtimestamp(ts_to).strftime("%Y-%m-%d"),
+        "building": b or None,
+        "items": items,
+    }
+
+
+# backward-compatible endpoint (เดิมใช้ใน dashboard เวอร์ชันก่อน)
 @app.get("/admin/dashboard/location-breakdown")
 def admin_dashboard_location_breakdown(
     request: Request,
@@ -1186,29 +1403,10 @@ def admin_dashboard_location_breakdown(
     building: str,
     authorization: str | None = Header(None),
 ):
-    user = get_current_user(request, authorization)
-    if user.get("role") not in ("admin", "root"):
-        raise HTTPException(403, "Admins only")
-
-    days = _range_to_days(range)
-    start_ts = _start_ts_days(days)
-
-    conn = db()
-    rows = conn.execute(
-        """
-        SELECT COALESCE(item_type, '-') AS item_type,
-               COUNT(*) AS c
-        FROM complaints
-        WHERE created_at >= ?
-          AND (COALESCE(building,'') = ? OR (COALESCE(building,'')='' AND COALESCE(location,'') LIKE ?))
-        GROUP BY item_type
-        ORDER BY c DESC
-        """,
-        (start_ts, building, f"{building}%"),
-    ).fetchall()
-
-    return {
-        "building": building,
-        "range": range,
-        "items": [{"item_type": r["item_type"], "count": r["c"]} for r in rows],
-    }
+    return admin_dashboard_item_types(
+        request=request,
+        start=None,
+        end=None,
+        building=building,
+        authorization=authorization,
+    )

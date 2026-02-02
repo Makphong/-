@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Admin - Dashboard</title>
     <link rel="stylesheet" href="/static/css/web.css" />
-    <!-- ApexCharts (Interactive candlestick + line + bar) -->
+    <!-- ApexCharts -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <style>
       .tabs {
@@ -81,14 +81,61 @@
         font-weight: 900;
       }
 
-      .rangeSelect {
-        min-width: 220px;
-      }
-
       .note {
         color: var(--muted);
         font-weight: 700;
         font-size: 13px;
+        margin-top: 4px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .rangeSelect {
+        min-width: 200px;
+      }
+
+      .dateInput {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 9px 10px;
+        font-weight: 800;
+        background: #fff;
+      }
+
+      .btnMini {
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 12px;
+        padding: 9px 12px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .btnMini.primary {
+        border-color: rgba(30, 115, 216, 0.35);
+        background: rgba(30, 115, 216, 0.08);
+        color: var(--primary);
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-weight: 900;
+        font-size: 12px;
+        background: #fff;
+      }
+
+      .pill b {
+        color: var(--primary);
       }
     </style>
   </head>
@@ -127,43 +174,79 @@
             </div>
           </div>
 
+          <!-- TOOL 1 -->
           <div class="chartCard">
             <div class="chartTop">
               <div>
                 <div class="chartTitle">กราฟแสดงจำนวนเคสรายงาน</div>
-                <!-- <div class="note">เลือกกรอบเวลา: รายสัปดาห์ / รายเดือน / รายสามเดือน / รายปี</div> -->
+                <div class="note">
+                  แท่ง = จำนวนเรื่องร้องเรียนที่ได้รับ • เส้น =
+                  จำนวนเรื่องร้องเรียนที่ “เสร็จสิ้น”
+                </div>
               </div>
-              <select class="rangeSelect" id="rangeSelect1">
-                <option value="week">รายสัปดาห์</option>
-                <option value="month">รายเดือน</option>
-                <option value="3month">รายสามเดือน</option>
-                <option value="year">รายปี</option>
-              </select>
+              <div class="controls">
+                <select class="rangeSelect" id="granSelect">
+                  <option value="week">รายสัปดาห์</option>
+                  <option value="month">รายเดือน</option>
+                  <option value="3month">รายสามเดือน</option>
+                  <option value="year">รายปี</option>
+                </select>
+              </div>
             </div>
-            <div id="lineChart"></div>
+            <div id="casesChart"></div>
           </div>
 
+          <!-- TOOL 2 -->
           <div class="chartCard">
             <div class="chartTop">
               <div>
-                <div class="chartTitle">กราฟแท่งเทียนตามสถานที่ (อาคาร)</div>
-                <!-- <div class="note">แท่งเทียนคำนวณจากจำนวนเคสรายวันของแต่ละอาคาร</div> -->
+                <div class="chartTitle">กราฟแท่งตามสถานที่ (อาคาร)</div>
+                <div class="note" id="buildingScopeNote">
+                  ค่าเริ่มต้น: ตั้งแต่เริ่มมีข้อมูล (ทุกช่วงเวลา)
+                </div>
               </div>
-              <!-- <select class="rangeSelect" id="rangeSelect2">
-                            <option value="week">รายสัปดาห์</option>
-                            <option value="month">รายเดือน</option>
-                            <option value="3month">รายสามเดือน</option>
-                            <option value="year">รายปี</option>
-                        </select> -->
-            </div>
-            <div id="candleChart"></div>
-            <div style="margin-top: 12px">
-              <div class="chartTitle" id="drillTitle" style="display: none">
-                จำนวนหมวดประเภทสิ่งของของสถานที่:
-                <span id="drillBuilding"></span>
+
+              <div class="controls">
+                <span class="pill" id="scopePill" style="display: none">
+                  อ้างอิงจากกราฟจำนวนเคส: <b id="scopePillText"></b>
+                </span>
+
+                <select class="rangeSelect" id="scopeMode">
+                  <option value="all">ค่าเริ่มต้น (ตั้งแต่เริ่ม)</option>
+                  <option value="linked">อ้างอิงจากกราฟจำนวนเคสรายงาน</option>
+                  <option value="custom">กำหนดช่วงเอง</option>
+                </select>
+
+                <input class="dateInput" type="date" id="fromDate" />
+                <input class="dateInput" type="date" id="toDate" />
+                <button class="btnMini primary" id="applyRange" type="button">
+                  ใช้ช่วงเวลา
+                </button>
               </div>
-              <div id="barChart"></div>
             </div>
+            <div id="buildingChart"></div>
+          </div>
+
+          <!-- TOOL 3 -->
+          <div class="chartCard">
+            <div class="chartTop">
+              <div>
+                <div class="chartTitle">จำนวนหมวดประเภทสิ่งของของสถานที่</div>
+                <div class="note" id="itemScopeNote">
+                  ค่าเริ่มต้น: รวมทุกอาคาร (ทุกช่วงเวลา)
+                </div>
+              </div>
+
+              <div class="controls">
+                <span class="pill" id="buildingPill" style="display: none">
+                  อาคาร: <b id="buildingPillText"></b>
+                </span>
+                <button class="btnMini" id="clearBuilding" type="button">
+                  ล้างการเลือกอาคาร
+                </button>
+              </div>
+            </div>
+            <div id="itemTypeChart"></div>
           </div>
 
           <div class="footer">
@@ -175,7 +258,7 @@
     </div>
 
     <script>
-      // tabs
+      // ===== tabs =====
       document
         .getElementById("tabDash")
         .addEventListener("click", () =>
@@ -192,124 +275,446 @@
           window.location.replace("/admin/users"),
         );
 
+      // ===== elements =====
       const todayEl = document.getElementById("todayCount");
       const unresolvedEl = document.getElementById("unresolvedTotal");
 
-      let lineChart = null;
-      let candleChart = null;
-      let barChart = null;
+      const granSelect = document.getElementById("granSelect");
 
-      function buildLine(series) {
-        const categories = series.map((x) => x.date);
-        const data = series.map((x) => x.count);
+      const scopeMode = document.getElementById("scopeMode");
+      const fromDate = document.getElementById("fromDate");
+      const toDate = document.getElementById("toDate");
+      const applyRangeBtn = document.getElementById("applyRange");
 
-        const options = {
-          chart: { type: "area", height: 280, toolbar: { show: false } },
-          series: [{ name: "จำนวนเคส", data }],
-          xaxis: { categories },
-          dataLabels: { enabled: false },
-          stroke: { curve: "smooth" },
-        };
+      const scopePill = document.getElementById("scopePill");
+      const scopePillText = document.getElementById("scopePillText");
 
-        if (lineChart) {
-          lineChart.destroy();
-        }
-        lineChart = new ApexCharts(
-          document.querySelector("#lineChart"),
-          options,
-        );
-        lineChart.render();
+      const buildingScopeNote = document.getElementById("buildingScopeNote");
+
+      const buildingPill = document.getElementById("buildingPill");
+      const buildingPillText = document.getElementById("buildingPillText");
+      const clearBuildingBtn = document.getElementById("clearBuilding");
+
+      const itemScopeNote = document.getElementById("itemScopeNote");
+
+      // ===== charts =====
+      let casesChart = null;
+      let buildingChart = null;
+      let itemTypeChart = null;
+
+      // ===== state (linking) =====
+      // time filter:
+      // - all: ตั้งแต่เริ่ม
+      // - linked: อ้างอิงจากแท่งในกราฟจำนวนเคส
+      // - custom: เลือกวันที่เอง
+      let timeMode = "all";
+      let linkedBucket = null; // {label,start,end}
+      let customRange = { start: null, end: null };
+
+      // building filter for tool #3
+      let selectedBuilding = null;
+
+      // ===== helpers =====
+      function setInputsEnabled(enabled) {
+        fromDate.disabled = !enabled;
+        toDate.disabled = !enabled;
+        applyRangeBtn.disabled = !enabled;
       }
 
-      function buildCandle(candles, range) {
+      function getEffectiveRange() {
+        if (timeMode === "linked" && linkedBucket) {
+          return { start: linkedBucket.start, end: linkedBucket.end };
+        }
+        if (timeMode === "custom" && customRange.start && customRange.end) {
+          return { start: customRange.start, end: customRange.end };
+        }
+        return { start: null, end: null }; // all-time
+      }
+
+      function updateScopeUI() {
+        if (timeMode === "linked" && linkedBucket) {
+          scopePill.style.display = "inline-flex";
+          scopePillText.textContent = linkedBucket.label;
+          buildingScopeNote.textContent =
+            "อ้างอิงจากกราฟแสดงจำนวนเคสรายงาน: " + linkedBucket.label;
+
+          setInputsEnabled(false);
+        } else {
+          scopePill.style.display = "none";
+          scopePillText.textContent = "";
+
+          if (timeMode === "custom") {
+            buildingScopeNote.textContent =
+              "กำหนดช่วงเวลาเอง: " +
+              (customRange.start || "-") +
+              " ถึง " +
+              (customRange.end || "-");
+            setInputsEnabled(true);
+          } else {
+            buildingScopeNote.textContent =
+              "ค่าเริ่มต้น: ตั้งแต่เริ่มมีข้อมูล (ทุกช่วงเวลา)";
+            setInputsEnabled(false);
+          }
+        }
+
+        if (selectedBuilding) {
+          buildingPill.style.display = "inline-flex";
+          buildingPillText.textContent = selectedBuilding;
+        } else {
+          buildingPill.style.display = "none";
+          buildingPillText.textContent = "";
+        }
+
+        // tool #3 note
+        const r = getEffectiveRange();
+        const rangeText =
+          r.start && r.end
+            ? `ช่วงเวลา: ${r.start} ถึง ${r.end}`
+            : "ทุกช่วงเวลา";
+
+        if (selectedBuilding) {
+          itemScopeNote.textContent = `อ้างอิงอาคาร: ${selectedBuilding} • ${rangeText}`;
+        } else {
+          itemScopeNote.textContent = `รวมทุกอาคาร • ${rangeText}`;
+        }
+      }
+
+      function xLabelFormatter(value, timestamp, opts) {
+        // แสดง label เท่าที่ "ไม่ซ้อนกัน" แบบอัตโนมัติ (ทุกกราฟ)
+        try {
+          const labels = opts?.w?.globals?.labels || [];
+          const total = labels.length || 0;
+          if (total <= 1) return value;
+
+          // ความกว้างพื้นที่ plot (px)
+          const w = opts?.w?.globals?.svgWidth || 600;
+
+          // ประเมินความยาวตัวอักษรที่ยาวสุด เพื่อคำนวนจำนวน label ที่พอวางได้
+          let maxLen = 0;
+          for (const t of labels) {
+            const s = String(t ?? "");
+            if (s.length > maxLen) maxLen = s.length;
+          }
+
+          // ประเมินความกว้างต่อ 1 label (px) แบบคร่าว ๆ
+          const charPx = 7.2; // กว้างต่อ 1 ตัวอักษรโดยประมาณ
+          const gapPx = 14; // ระยะห่างขั้นต่ำระหว่าง label
+          const labelPx = Math.max(20, maxLen * charPx) + gapPx;
+
+          // จำนวน label ที่ "คาดว่า" จะไม่ชนกัน
+          const maxLabels = Math.max(2, Math.floor(w / labelPx));
+
+          // หากใส่ได้ทั้งหมดก็แสดงหมด
+          if (total <= maxLabels) return value;
+
+          // ไม่งั้นแสดงแบบข้ามเป็นช่วง ๆ
+          const step = Math.ceil(total / maxLabels);
+          const i = opts?.i ?? 0;
+
+          // คงไว้ให้เห็นหัว/ท้ายเสมอ
+          if (i === 0 || i === total - 1) return value;
+          return i % step === 0 ? value : "";
+        } catch (e) {
+          return value;
+        }
+      }
+
+      // ===== tool #1: cases chart (bar + line) =====
+      function buildCasesChart(buckets) {
+        const categories = (buckets || []).map((b) => b.label);
+        const received = (buckets || []).map((b) => b.received || 0);
+        const done = (buckets || []).map((b) => b.done || 0);
+
+        // ✅ บังคับแสดง label แกน X ไม่เกิน 3 ตัว: แรก / กลาง / ท้าย (ไม่พึ่ง opts.i)
+        const max3LabelFormatter = (() => {
+          const total = categories.length;
+          if (total <= 3) return (val) => val;
+
+          const first = 0;
+          const last = total - 1;
+          const mid = Math.floor((total - 1) / 2);
+
+          const allowed = new Set([
+            String(categories[first]),
+            String(categories[mid]),
+            String(categories[last]),
+          ]);
+
+          return (val) => (allowed.has(String(val)) ? val : "");
+        })();
+
         const options = {
           chart: {
-            type: "candlestick",
+            type: "line",
             height: 320,
+
             toolbar: { show: false },
+            stacked: false,
             events: {
-              dataPointSelection: async function (event, chartContext, config) {
+              dataPointSelection: function (event, chartContext, config) {
                 const idx = config.dataPointIndex;
-                const item = candles[idx];
-                if (!item) return;
-                await loadBreakdown(range, item.x);
+                const b = buckets[idx];
+                if (!b) return;
+
+                // link tool #2 + #3 to selected bucket
+                timeMode = "linked";
+                linkedBucket = { label: b.label, start: b.start, end: b.end };
+                scopeMode.value = "linked";
+                updateScopeUI();
+                loadBuildingsAndItems();
               },
             },
           },
-          series: [{ name: "สถานที่", data: candles }],
-          xaxis: { type: "category" },
+          series: [
+            { name: "ได้รับเรื่องร้องเรียน", type: "column", data: received },
+            { name: "เสร็จสิ้น", type: "line", data: done },
+          ],
+          stroke: { width: [0, 3], curve: "smooth" },
+          dataLabels: { enabled: false },
+          xaxis: {
+            categories,
+            tickAmount: 3,
+            labels: {
+              rotate: 0,
+              hideOverlappingLabels: true,
+              showDuplicates: false,
+              formatter: max3LabelFormatter,
+            },
+          },
+
+          yaxis: [{ title: { text: "จำนวน" } }],
+          plotOptions: {
+            bar: {
+              columnWidth: "55%",
+              borderRadius: 6,
+            },
+          },
+          tooltip: { shared: true, intersect: false },
+          legend: { position: "top" },
         };
 
-        if (candleChart) {
-          candleChart.destroy();
-        }
-        candleChart = new ApexCharts(
-          document.querySelector("#candleChart"),
+        if (casesChart) casesChart.destroy();
+        casesChart = new ApexCharts(
+          document.querySelector("#casesChart"),
           options,
         );
-        candleChart.render();
+        casesChart.render();
       }
 
-      function buildBar(items) {
-        const categories = items.map((x) => x.item_type);
-        const data = items.map((x) => x.count);
-
-        const options = {
-          chart: { type: "bar", height: 260, toolbar: { show: false } },
-          series: [{ name: "จำนวน", data }],
-          xaxis: { categories },
-          dataLabels: { enabled: false },
-        };
-
-        if (barChart) {
-          barChart.destroy();
-        }
-        barChart = new ApexCharts(document.querySelector("#barChart"), options);
-        barChart.render();
-      }
-
-      async function loadSummary(range) {
+      async function loadCases() {
+        const gran = granSelect.value || "week";
         const res = await fetch(
-          `/admin/dashboard/summary?range=${encodeURIComponent(range)}`,
+          `/admin/dashboard/summary?range=${encodeURIComponent(gran)}`,
         );
         const d = await res.json();
         todayEl.textContent = d.today_count ?? "-";
         unresolvedEl.textContent = d.unresolved_total ?? "-";
-        buildLine(d.series || []);
-        buildCandle(d.candles || [], range);
+        buildCasesChart(d.buckets || []);
 
-        // reset drilldown
-        document.getElementById("drillTitle").style.display = "none";
-        document.getElementById("drillBuilding").textContent = "";
-        if (barChart) {
-          barChart.destroy();
-          barChart = null;
+        // ถ้าเคยลิงก์ไว้ แล้วผู้ใช้เปลี่ยน granularities: ล้างลิงก์ (กันช่วงเวลาไม่ตรงกัน)
+        if (timeMode === "linked") {
+          timeMode = "all";
+          linkedBucket = null;
+          scopeMode.value = "all";
+          updateScopeUI();
+          loadBuildingsAndItems();
         }
-        document.querySelector("#barChart").innerHTML = "";
       }
 
-      async function loadBreakdown(range, building) {
-        const res = await fetch(
-          `/admin/dashboard/location-breakdown?range=${encodeURIComponent(range)}&building=${encodeURIComponent(building)}`,
+      // ===== tool #2: building bar =====
+      function buildBuildingChart(items) {
+        const categories = (items || []).map((x) => x.building);
+        const data = (items || []).map((x) => x.count || 0);
+
+        const options = {
+          chart: {
+            type: "bar",
+            height: 320,
+
+            toolbar: { show: false },
+            events: {
+              dataPointSelection: function (event, chartContext, config) {
+                const idx = config.dataPointIndex;
+                const b = items[idx];
+                if (!b) return;
+                selectedBuilding = b.building;
+                updateScopeUI();
+                loadItems();
+              },
+            },
+          },
+          series: [{ name: "จำนวนเรื่องร้องเรียน", data }],
+          xaxis: {
+            categories,
+            labels: {
+              rotate: 0,
+              hideOverlappingLabels: true,
+              showDuplicates: false,
+              formatter: function (val, timestamp, opts) {
+                // ✅ บังคับให้แสดง label ไม่เกิน 3 ตัว: แรก/กลาง/ท้าย
+                const labels = opts?.w?.globals?.labels || [];
+                const total = labels.length || 0;
+                const i = opts?.i ?? 0;
+
+
+                if (total <= 3) return val;
+
+                const first = 0;
+                const last = total - 1;
+                const mid = Math.floor((total - 1) / 2);
+
+                if (i === first || i === mid || i === last) return val;
+                return "";
+              },
+            },
+          },
+
+          dataLabels: { enabled: false },
+          plotOptions: {
+            bar: {
+              horizontal: false,
+              borderRadius: 6,
+              columnWidth: "55%",
+            },
+          },
+          tooltip: { shared: false },
+        };
+
+        if (buildingChart) buildingChart.destroy();
+        buildingChart = new ApexCharts(
+          document.querySelector("#buildingChart"),
+          options,
         );
-        const d = await res.json();
-        document.getElementById("drillTitle").style.display = "block";
-        document.getElementById("drillBuilding").textContent = building;
-        buildBar(d.items || []);
-        document
-          .querySelector("#barChart")
-          .scrollIntoView({ behavior: "smooth", block: "start" });
+        buildingChart.render();
       }
 
-      const r1 = document.getElementById("rangeSelect1");
+      async function loadBuildings() {
+        const r = getEffectiveRange();
+        const qs = new URLSearchParams();
+        if (r.start) qs.set("start", r.start);
+        if (r.end) qs.set("end", r.end);
 
-      // dropdown ตัวเดียว คุมทั้ง line + candlestick
-      r1.addEventListener("change", async () => {
-        await loadSummary(r1.value);
+        const res = await fetch(`/admin/dashboard/buildings?` + qs.toString());
+        const d = await res.json();
+        buildBuildingChart(d.items || []);
+      }
+
+      // ===== tool #3: item types bar =====
+      function buildItemTypeChart(items) {
+        const categories = (items || []).map((x) => x.item_type);
+        const data = (items || []).map((x) => x.count || 0);
+
+        const options = {
+          chart: {
+            type: "bar",
+            height: 300,
+            toolbar: { show: false },
+          },
+          series: [{ name: "จำนวน", data }],
+          xaxis: {
+            categories,
+            labels: { formatter: xLabelFormatter, rotate: 0 },
+          },
+          dataLabels: { enabled: false },
+          plotOptions: {
+            bar: {
+              horizontal: false,
+              borderRadius: 6,
+              columnWidth: "55%",
+            },
+          },
+        };
+
+        if (itemTypeChart) itemTypeChart.destroy();
+        itemTypeChart = new ApexCharts(
+          document.querySelector("#itemTypeChart"),
+          options,
+        );
+        itemTypeChart.render();
+      }
+
+      async function loadItems() {
+        const r = getEffectiveRange();
+        const qs = new URLSearchParams();
+        if (r.start) qs.set("start", r.start);
+        if (r.end) qs.set("end", r.end);
+        if (selectedBuilding) qs.set("building", selectedBuilding);
+
+        const res = await fetch(`/admin/dashboard/item-types?` + qs.toString());
+        const d = await res.json();
+        buildItemTypeChart(d.items || []);
+      }
+
+      async function loadBuildingsAndItems() {
+        updateScopeUI();
+        await loadBuildings();
+        await loadItems();
+      }
+
+      // ===== controls =====
+      granSelect.addEventListener("change", async () => {
+        await loadCases();
+      });
+
+      scopeMode.addEventListener("change", async () => {
+        const v = scopeMode.value;
+
+        if (v === "all") {
+          timeMode = "all";
+          linkedBucket = null;
+          customRange = { start: null, end: null };
+
+          fromDate.value = "";
+          toDate.value = "";
+        }
+
+        if (v === "linked") {
+          // ถ้ายังไม่เคยคลิกแท่งในกราฟจำนวนเคส -> กลับไปค่าเริ่มต้น
+          if (!linkedBucket) {
+            scopeMode.value = "all";
+            timeMode = "all";
+          } else {
+            timeMode = "linked";
+          }
+        }
+
+        if (v === "custom") {
+          timeMode = "custom";
+          setInputsEnabled(true);
+        }
+
+        updateScopeUI();
+        await loadBuildingsAndItems();
+      });
+
+      applyRangeBtn.addEventListener("click", async () => {
+        const s = fromDate.value;
+        const e = toDate.value;
+
+        if (!s || !e) return;
+
+        // ใช้ช่วงเอง
+        timeMode = "custom";
+        scopeMode.value = "custom";
+        linkedBucket = null;
+
+        customRange = { start: s, end: e };
+        updateScopeUI();
+        await loadBuildingsAndItems();
+      });
+
+      clearBuildingBtn.addEventListener("click", async () => {
+        selectedBuilding = null;
+        updateScopeUI();
+        await loadItems();
       });
 
       // init
-      loadSummary("week");
+      (async () => {
+        updateScopeUI();
+        await loadCases();
+        await loadBuildingsAndItems();
+      })();
     </script>
   </body>
 </html>
